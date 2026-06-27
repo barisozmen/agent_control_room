@@ -17,6 +17,6 @@ class DashboardsController < ApplicationController
   def sync_local_runtime_sessions
     return if Rails.env.test?
 
-    ObservedRuntimeSessions::LocalProcessSyncer.sync!
+    ObservedRuntimeSessions::LocalProcessSyncer.sync_if_stale!
   end
 end
