@@ -23,10 +23,15 @@ class CommunityDemoSystemTest < ApplicationSystemTestCase
     assert_selector "turbo-frame#permission_inbox", text: "Ask 1 of 1"
 
     click_button "Deny"
-    assert_selector "turbo-frame#permission_inbox", text: "No pending asks"
-    assert_text "completed"
-
-    click_link "Receipts"
+    within("turbo-frame#permission_inbox") do
+      assert_text "No pending asks"
+      assert_text "All permission asks are resolved."
+      assert_text(/last decision/i)
+      assert_text "Denied"
+      assert_text(/run status/i)
+      assert_text "completed"
+      click_link "Open receipts"
+    end
 
     assert_selector "turbo-frame#audit_timeline", text: "session.finished"
     assert_selector "turbo-frame#audit_timeline", text: "permission.decided"
