@@ -1,6 +1,70 @@
 require "test_helper"
 
 class RuntimeObserverEventsControllerTest < ActionDispatch::IntegrationTest
+  test "rejects observer events without machine token" do
+    assert_no_difference -> { Run.count } do
+      post runtime_observer_events_path(runtime_name: "codex"),
+        params: { runtime_event: { type: "session.started", session_id: "missing-token" } },
+        as: :json
+    end
+
+    assert_response :unauthorized
+    assert_equal false, response_json.fetch("ok")
+    assert_equal "Invalid machine token", response_json.fetch("error")
+  end
+
+  test "rejects observer events with invalid machine token" do
+    assert_no_difference -> { Run.count } do
+      post runtime_observer_events_path(runtime_name: "codex"),
+        params: { runtime_event: { type: "session.started", session_id: "invalid-token" } },
+        headers: { MachineBridge::HEADER => "invalid-machine-token" },
+        as: :json
+    end
+
+    assert_response :unauthorized
+    assert_equal false, response_json.fetch("ok")
+    assert_equal "Invalid machine token", response_json.fetch("error")
+  end
+
+  test "rejects non-json observer events" do
+    assert_no_difference -> { Run.count } do
+      post runtime_observer_events_path(runtime_name: "codex"),
+        params: { runtime_event: { type: "session.started", session_id: "non-json" } },
+        headers: machine_bridge_headers
+    end
+
+    assert_response :unsupported_media_type
+    assert_equal false, response_json.fetch("ok")
+    assert_equal "Runtime observer events must be posted as JSON", response_json.fetch("error")
+  end
+
+  test "rejects observer events for unknown runtimes" do
+    assert_no_difference -> { Run.count } do
+      post_observer_event(
+        "future_runtime",
+        type: "session.started",
+        session_id: "unknown-runtime"
+      )
+    end
+
+    assert_response :unprocessable_entity
+    assert_equal false, response_json.fetch("ok")
+    assert_equal "Unsupported runtime: future_runtime", response_json.fetch("error")
+  end
+
+  test "rejects malformed observer events" do
+    post_observer_event(
+      "codex",
+      type: "tool.requested",
+      event_id: "malformed-tool-request",
+      session_id: "malformed-observed-session"
+    )
+
+    assert_response :unprocessable_entity
+    assert_equal false, response_json.fetch("ok")
+    assert_match(/key not found/, response_json.fetch("error"))
+  end
+
   test "creates an observed Claude Code session and runtime-specific base passports" do
     assert_difference -> { Run.count }, 1 do
       post_observer_event(
@@ -65,5 +129,9 @@ class RuntimeObserverEventsControllerTest < ActionDispatch::IntegrationTest
       params: { runtime_event: event },
       headers: machine_bridge_headers,
       as: :json
+  end
+
+  def response_json
+    JSON.parse(response.body)
   end
 end
