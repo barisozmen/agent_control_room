@@ -67,6 +67,10 @@ module ApplicationHelper
     end
   end
 
+  def status_label(status)
+    status.to_s.humanize.downcase
+  end
+
   def request_decision_button_classes(kind)
     case kind
     when :primary then "ap-decision-button ap-decision-primary"

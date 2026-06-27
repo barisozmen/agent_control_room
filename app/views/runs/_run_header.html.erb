@@ -5,8 +5,8 @@
         <div class="flex flex-wrap items-center gap-3">
           <h1 class="ap-mono w-full text-2xl font-medium leading-tight ap-text-strong sm:w-auto">Agent Control Room</h1>
           <span class="ap-mono inline-flex items-center gap-2 text-xs font-medium ap-body-muted">
-            <span class="ap-status-dot <%= status_dot_classes(run.status) %>"></span>
-            <%= run.status %>
+            <span class="ap-status-dot <%= status_dot_classes(run.status) %>" aria-hidden="true"></span>
+            <span class="ap-status-text">Status: <%= status_label(run.status) %></span>
           </span>
           <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.passports.count, "passport") %></span>
           <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.permission_requests.where(status: "pending").count, "pending ask") %></span>

@@ -9,8 +9,8 @@
       <div class="ap-scroll flex-1 space-y-5 overflow-auto p-4">
         <section>
           <div class="flex items-center gap-2">
-            <span class="ap-status-dot <%= status_dot_classes(passport.status) %>"></span>
-            <span class="ap-mono text-xs font-medium ap-body-muted"><%= passport.provider %> / <%= passport.actor_kind %></span>
+            <span class="ap-status-dot <%= status_dot_classes(passport.status) %>" aria-hidden="true"></span>
+            <span class="ap-status-text ap-mono text-xs font-medium ap-body-muted">Status: <%= status_label(passport.status) %> / <%= passport.provider %> / <%= passport.actor_kind %></span>
           </div>
           <p class="ap-mono mt-3 break-words text-xs leading-5 ap-muted"><%= passport.lineage_label %></p>
           <% if passport.task.present? %>

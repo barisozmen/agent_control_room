@@ -67,9 +67,42 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     get run_path(failed_run)
 
     assert_response :success
-    assert_select "span", text: "failed"
+    assert_select "span", text: "Status: failed"
     assert_select "p", text: "opencode missing"
     assert_select "p", text: /Install OpenCode/
     assert_select "button", text: "Retry OpenCode demo"
+  end
+
+  test "run page exposes current session, selected passport, and status labels" do
+    other_run = Run.create!(
+      runtime_name: "opencode",
+      runtime_session_id: "session-other",
+      title: "Other project",
+      project_path: "/tmp/other-project",
+      mode: "observed",
+      status: "running",
+      started_at: 5.minutes.ago,
+      last_seen_at: 5.minutes.ago
+    )
+    run = create_run
+    owner = create_passport(run: run, actor_ref: "baris", actor_name: "Baris", actor_kind: "human", provider: "local")
+    passport = create_passport(run: run, actor_ref: "main-agent", actor_name: "opencode/main-agent", parent: owner)
+
+    get run_path(run, passport_id: passport.id, panel: "passport")
+
+    assert_response :success
+    assert_select "a.ap-session-row[href='#{run_path(run)}'][aria-current='page']" do
+      assert_select ".ap-status-dot[aria-hidden='true']"
+      assert_select ".ap-status-text", text: "Status: running"
+    end
+    assert_select "a.ap-session-row[href='#{run_path(other_run)}'][aria-current]", count: 0
+
+    assert_select "a.ap-passport-node[href='#{run_path(run, passport_id: passport.id, panel: "passport")}'][aria-current='page']" do
+      assert_select ".ap-status-dot[aria-hidden='true']"
+      assert_select ".ap-status-text", text: "Status: active"
+    end
+    assert_select "a.ap-passport-node[href='#{run_path(run, passport_id: owner.id, panel: "passport")}'][aria-current]", count: 0
+    assert_select "turbo-frame#run_header .ap-status-text", text: "Status: running"
+    assert_select "turbo-frame#passport_detail .ap-status-text", text: /Status: active/
   end
 end

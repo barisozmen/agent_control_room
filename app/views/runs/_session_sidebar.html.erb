@@ -16,10 +16,13 @@
           <% runs.each do |run| %>
             <% selected = selected_run&.id == run.id %>
             <li>
-              <%= link_to run_path(run), class: "ap-session-row #{selected ? "ap-session-row-selected" : ""}", data: { turbo_frame: "_top" } do %>
-                <span class="ap-status-dot mt-1 shrink-0 <%= status_dot_classes(run.status) %>"></span>
+              <% link_options = { class: "ap-session-row #{selected ? "ap-session-row-selected" : ""}", data: { turbo_frame: "_top" } } %>
+              <% link_options[:aria] = { current: "page" } if selected %>
+              <%= link_to run_path(run), link_options do %>
+                <span class="ap-status-dot mt-1 shrink-0 <%= status_dot_classes(run.status) %>" aria-hidden="true"></span>
                 <span class="min-w-0 flex-1">
                   <span class="block truncate text-sm font-semibold ap-text-strong"><%= run.display_title %></span>
+                  <span class="ap-status-text ap-mono mt-1 block truncate text-xs ap-muted">Status: <%= status_label(run.status) %></span>
                   <span class="ap-mono mt-1 block truncate text-xs ap-muted"><%= run.display_project %></span>
                   <span class="ap-mono mt-1 block truncate text-xs ap-body-muted">
                     <%= run.runtime_label %> / <%= run.runtime_session_id.presence || "demo-run-#{run.id}" %>
