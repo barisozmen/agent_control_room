@@ -3,7 +3,7 @@ require "open3"
 
 class RuntimeAdapters::OpencodeObserverPluginTest < ActiveSupport::TestCase
   test "global observer plugin source is importable and posts machine events" do
-    skip "node is not available" unless system("node", "--version", out: File::NULL, err: File::NULL)
+    require_node_for_bridge_tests!
 
     stdout, stderr, status = Open3.capture3(node_test_env, "node", "--input-type=module", "-", stdin_data: node_observer_test, chdir: Rails.root.to_s)
 

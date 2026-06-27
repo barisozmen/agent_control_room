@@ -20,7 +20,10 @@ Desktop.ini
 .cursor/
 .windsurf/
 .zed/
-.opencode/
+.opencode/*
+!.opencode/package.json
+!.opencode/plugins/
+!.opencode/plugins/agent-passports.js
 
 # Secrets and local environment
 .env

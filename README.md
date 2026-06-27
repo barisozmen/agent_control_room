@@ -36,7 +36,7 @@ The observer is fail-open when the Rails app is offline, so stopping Agent Contr
 1. Read `docs/runtime_adapters.md` to understand the runtime-neutral event boundary.
 2. Run `bin/setup --skip-server` and `bin/dev`.
 3. Open the local URL from `bin/find_server_port --url`.
-4. Run `bin/rails test:all` before opening a PR.
+4. Run `bin/rails test:all` before opening a PR. Node must be available for the JavaScript bridge tests.
 5. Keep runtime-specific work inside adapters, not the passport or authorization core.
 
 ## What It Does
@@ -132,6 +132,8 @@ That boundary is the reason another coding-agent CLI can be added without rewrit
 ```bash
 bin/rails test:all
 ```
+
+Node must be available for the JavaScript bridge tests. For an intentional local opt-out, run with `SKIP_NODE_BRIDGE_TESTS=1`.
 
 If your shell has `BUNDLE_GEMFILE` set to another repo:
 
