@@ -1,4 +1,6 @@
+<% audit_event_page = @run.audit_timeline_page %>
+
 <%= turbo_stream.replace "run_header", partial: "runs/run_header", locals: { run: @run } %>
 <%= turbo_stream.replace "permission_inbox", partial: "runs/permission_inbox", locals: { run: @run } %>
 <%= turbo_stream.replace "passport_detail", partial: "runs/passport_detail", locals: { run: @run, passport: @passport } %>
-<%= turbo_stream.replace "audit_timeline", partial: "runs/audit_timeline", locals: { run: @run, audit_events: @run.audit_events.chronological } %>
+<%= turbo_stream.replace "audit_timeline", partial: "runs/audit_timeline", locals: { run: @run, audit_event_page: audit_event_page } %>

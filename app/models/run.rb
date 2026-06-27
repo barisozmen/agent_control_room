@@ -130,7 +130,7 @@ class Run < ApplicationRecord
     broadcast_replace_to self, target: "run_header", partial: "runs/run_header", locals: { run: self }
     broadcast_replace_to self, target: "passport_tree", partial: "runs/passport_tree", locals: { run: self, selected_passport: selected_passport, passport_tree: passport_tree }
     broadcast_replace_to self, target: "permission_inbox", partial: "runs/permission_inbox", locals: { run: self }
-    broadcast_replace_to self, target: "audit_timeline", partial: "runs/audit_timeline", locals: { run: self, audit_events: audit_events.chronological }
+    broadcast_replace_to self, target: "audit_timeline", partial: "runs/audit_timeline", locals: { run: self, audit_event_page: audit_timeline_page }
     broadcast_replace_to "runtime_sessions", target: "session_sidebar", partial: "runs/session_sidebar", locals: session_sidebar.merge(selected_run: nil)
 
     return unless selected_passport.present?
@@ -157,6 +157,10 @@ class Run < ApplicationRecord
     return unless normalized_changes.include?(:passport_detail) && selected_passport.present?
 
     broadcast_replace_to self, target: "passport_detail", partial: "runs/passport_detail", locals: { run: self, passport: selected_passport }
+  end
+
+  def audit_timeline_page(before_id: nil)
+    AuditEvent.timeline_page_for(self, before_id: before_id)
   end
 
   private

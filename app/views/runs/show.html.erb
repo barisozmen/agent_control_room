@@ -29,7 +29,7 @@
         </div>
 
         <% if @panel == "audit" %>
-          <%= render "runs/audit_timeline", run: @run, audit_events: @run.audit_events.chronological %>
+          <%= render "runs/audit_timeline", run: @run, audit_event_page: @run.audit_timeline_page %>
         <% else %>
           <%= render "runs/passport_detail", run: @run, passport: @selected_passport %>
         <% end %>
