@@ -8,7 +8,11 @@ class RuntimeObserverEventsController < ApplicationController
     authenticate_machine_token!
 
     ingestion = ObservedRuntimeSessions::Ingestor.new(runtime_name: params.fetch(:runtime_name), event: runtime_event_params).process
-    ingestion.run.broadcast_control_room!(selected_passport: selected_passport_for(ingestion.result))
+    ingestion.run.broadcast_runtime_event!(
+      audit_event: ingestion.audit_event,
+      ui_changes: ingestion.ui_changes,
+      selected_passport: selected_passport_for(ingestion.result)
+    )
 
     render json: runtime_event_response(ingestion), status: :created
   rescue UnsupportedBridgeMediaType => error

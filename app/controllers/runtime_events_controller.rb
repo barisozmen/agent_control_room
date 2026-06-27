@@ -8,8 +8,13 @@ class RuntimeEventsController < ApplicationController
     event = runtime_event_params
     run = Run.find(event.fetch(:run_id))
     authenticate_bridge_token!(run)
-    result = CanonicalRuntimeEvents::Processor.new(run: run, event: event).process
-    run.broadcast_control_room!(selected_passport: selected_passport_for(result))
+    processor = CanonicalRuntimeEvents::Processor.new(run: run, event: event)
+    result = processor.process
+    run.broadcast_runtime_event!(
+      audit_event: processor.audit_event,
+      ui_changes: processor.ui_changes,
+      selected_passport: selected_passport_for(result)
+    )
 
     render json: runtime_event_response(result), status: :created
   rescue UnsupportedBridgeMediaType => error

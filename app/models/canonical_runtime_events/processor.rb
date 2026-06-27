@@ -1,8 +1,11 @@
 module CanonicalRuntimeEvents
   class Processor
+    attr_reader :audit_event, :ui_changes
+
     def initialize(run:, event:)
       @run = run
       @event = event.with_indifferent_access
+      @ui_changes = []
     end
 
     def process
@@ -24,6 +27,7 @@ module CanonicalRuntimeEvents
 
     def record_session_started
       run.update!(status: "running", started_at: occurred_at)
+      mark_ui_changes(:run_header, :session_sidebar) if run.saved_change_to_status?
       audit!("session.started", result: "started", action_summary: "#{run.runtime_label} session started")
       run
     end
@@ -31,8 +35,10 @@ module CanonicalRuntimeEvents
     def mint_passport
       parent = event[:parent_actor_ref].present? ? run.passports.find_by!(actor_ref: event[:parent_actor_ref]) : nil
       rules = event.fetch(:rules).with_indifferent_access
+      created_passport = false
 
       passport = run.passports.find_or_create_by!(actor_ref: event.fetch(:actor_ref)) do |record|
+        created_passport = true
         record.parent = parent
         record.actor_name = event.fetch(:actor_name)
         record.actor_kind = event.fetch(:actor_kind)
@@ -45,6 +51,7 @@ module CanonicalRuntimeEvents
         record.web_rule = rules.fetch(:web)
         record.delegate_rule = rules.fetch(:delegate)
       end
+      mark_ui_changes(:run_header, :passport_tree, :passport_detail) if created_passport
 
       audit!(
         "actor.delegated",
@@ -68,6 +75,7 @@ module CanonicalRuntimeEvents
       case decision
       when "allow"
         action.update!(status: "allowed")
+        mark_ui_changes(:passport_detail) if action.saved_change_to_status?
         audit!("tool.allowed", passport: passport, tool_action: action, result: "allowed", capability: action.capability, action_summary: action.action_summary)
       when "ask"
         action.update!(status: "asking")
@@ -80,9 +88,11 @@ module CanonicalRuntimeEvents
           record.suggested_capability = event[:suggested_capability].presence || action.capability
           record.suggested_pattern = event[:suggested_pattern].presence || action.request_text
         end
+        mark_ui_changes(:run_header, :session_sidebar, :permission_inbox, :passport_detail)
         audit!("permission.requested", passport: passport, tool_action: action, permission_request: request, result: "ask", capability: action.capability, action_summary: action.action_summary)
       else
         action.update!(status: "blocked", finished_at: occurred_at)
+        mark_ui_changes(:passport_detail) if action.saved_change_to_status?
         audit!("tool.blocked", passport: passport, tool_action: action, result: "blocked", capability: action.capability, action_summary: action.action_summary)
       end
 
@@ -92,6 +102,7 @@ module CanonicalRuntimeEvents
     def finish_tool_action
       action = terminal_tool_action
       action.update!(status: "finished", finished_at: occurred_at, exit_status: event[:exit_status])
+      mark_ui_changes(:passport_detail) if action.saved_change_to_status?
       audit!("tool.finished", passport: action.passport, tool_action: action, result: "finished", capability: action.capability, action_summary: action.action_summary)
       action
     end
@@ -99,26 +110,35 @@ module CanonicalRuntimeEvents
     def block_tool_action
       action = terminal_tool_action
       action.update!(status: "blocked", finished_at: occurred_at)
+      mark_ui_changes(:passport_detail) if action.saved_change_to_status?
       audit!("tool.blocked", passport: action.passport, tool_action: action, result: "blocked", capability: action.capability, action_summary: action.action_summary)
       action
     end
 
     def finish_session
       run.update!(status: event[:status].presence || "completed", finished_at: occurred_at)
+      mark_ui_changes(:run_header, :session_sidebar) if run.saved_change_to_status?
       audit!("session.finished", result: run.status, action_summary: "#{run.runtime_label} session #{run.status}")
       run
     end
 
     def audit!(kind, result:, passport: nil, tool_action: nil, permission_request: nil, capability: nil, action_summary: nil)
+      created_audit_event = false
+
       if event[:event_id].present?
-        AuditEvent.find_or_create_by!(run: run, source_event_id: event[:event_id]) do |record|
+        record = AuditEvent.find_or_create_by!(run: run, source_event_id: event[:event_id]) do |record|
+          created_audit_event = true
           assign_audit_attributes(record, kind, result, passport, tool_action, permission_request, capability, action_summary)
         end
       else
-        AuditEvent.create!(run: run) do |record|
+        record = AuditEvent.create!(run: run) do |record|
+          created_audit_event = true
           assign_audit_attributes(record, kind, result, passport, tool_action, permission_request, capability, action_summary)
         end
       end
+
+      @audit_event = record if created_audit_event
+      record
     end
 
     def find_or_create_tool_action!(passport)
@@ -172,6 +192,10 @@ module CanonicalRuntimeEvents
 
     def occurred_at
       @occurred_at ||= event[:occurred_at].present? ? Time.zone.parse(event[:occurred_at].to_s) : Time.current
+    end
+
+    def mark_ui_changes(*changes)
+      @ui_changes |= changes
     end
   end
 end

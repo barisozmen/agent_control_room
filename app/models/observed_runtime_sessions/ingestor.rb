@@ -15,11 +15,12 @@ module ObservedRuntimeSessions
       session.finished
     ].freeze
 
-    attr_reader :event, :run, :result, :runtime
+    attr_reader :event, :run, :result, :runtime, :audit_event, :ui_changes
 
     def initialize(runtime_name:, event:)
       @runtime = RuntimeAdapters::Registry.fetch(runtime_name)
       @event = event.with_indifferent_access
+      @ui_changes = []
     end
 
     def process
@@ -36,6 +37,7 @@ module ObservedRuntimeSessions
 
     def find_or_create_run!
       Run.find_or_initialize_by(runtime_name: runtime.name, runtime_session_id: session_id).tap do |record|
+        new_run = record.new_record?
         record.project_path = project_path
         record.mode = "observed"
         record.status = "running" if record.new_record? || record.status.in?(%w[starting completed interrupted failed])
@@ -44,14 +46,21 @@ module ObservedRuntimeSessions
         record.observed_pid = observed_pid if observed_pid.present?
         record.last_seen_at = occurred_at
         record.save!
+
+        mark_ui_changes(:session_sidebar) if new_run || record.saved_change_to_title? || record.saved_change_to_project_path? || record.saved_change_to_status?
+        mark_ui_changes(:run_header) if record.saved_change_to_status?
       end
     end
 
     def process_canonical_event
-      CanonicalRuntimeEvents::Processor.new(
+      processor = CanonicalRuntimeEvents::Processor.new(
         run: run,
         event: canonical_event
-      ).process
+      )
+      processor.process.tap do
+        @audit_event = processor.audit_event
+        mark_ui_changes(*processor.ui_changes)
+      end
     end
 
     def canonical_event
@@ -73,13 +82,19 @@ module ObservedRuntimeSessions
     end
 
     def ensure_base_passports!
+      created_owner = false
       owner = run.passports.find_or_create_by!(actor_ref: OWNER_REF) do |passport|
+        created_owner = true
         assign_passport(passport, actor_name: local_owner_name, actor_kind: "human", provider: "local", parent: nil, task: "Local machine owner", rules: OWNER_RULES)
       end
 
+      created_agent = false
       run.passports.find_or_create_by!(actor_ref: MAIN_AGENT_REF) do |passport|
+        created_agent = true
         assign_passport(passport, actor_name: runtime.main_agent_name, actor_kind: "agent", provider: runtime.provider, parent: owner, task: runtime.observed_task, rules: AGENT_RULES)
       end
+
+      mark_ui_changes(:run_header, :passport_tree) if created_owner || created_agent
     end
 
     def ensure_actor_passport!
@@ -98,6 +113,7 @@ module ObservedRuntimeSessions
         )
         passport.actor_ref = actor_ref
       end
+      mark_ui_changes(:run_header, :passport_tree)
     end
 
     def assign_passport(passport, actor_name:, actor_kind:, provider:, parent:, task:, rules:)
@@ -126,6 +142,7 @@ module ObservedRuntimeSessions
 
     def touch_run!
       run.update!(last_seen_at: occurred_at, title: title)
+      mark_ui_changes(:session_sidebar) if run.saved_change_to_title?
     end
 
     def session_id
@@ -163,6 +180,10 @@ module ObservedRuntimeSessions
 
     def occurred_at
       @occurred_at ||= event[:occurred_at].present? ? Time.zone.parse(event[:occurred_at].to_s) : Time.current
+    end
+
+    def mark_ui_changes(*changes)
+      @ui_changes |= changes
     end
   end
 end
