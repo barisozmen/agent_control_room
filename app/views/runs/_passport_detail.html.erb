@@ -2,7 +2,7 @@
   <div class="flex h-full min-h-[360px] flex-col">
     <div class="ap-pane-header">
       <p class="ap-kicker">passport detail</p>
-      <h2 class="ap-pane-title mt-1"><%= passport&.actor_name || "No passport selected" %></h2>
+      <h2 id="passport-drawer-title" class="ap-pane-title mt-1"><%= passport&.actor_name || "No passport selected" %></h2>
     </div>
 
     <% if passport.present? %>

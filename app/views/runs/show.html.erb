@@ -1,25 +1,27 @@
-<main class="ap-shell min-h-dvh <%= "ap-shell-drawer-open" if @panel.present? %>">
+<main class="ap-shell min-h-dvh <%= "ap-shell-drawer-open" if @panel.present? %>" <% if @panel.present? %>data-controller="drawer" data-drawer-close-url-value="<%= run_path(@run, passport_id: @selected_passport&.id) %>"<% end %>>
   <%= turbo_stream_from @run %>
 
-  <%= render "runs/run_header", run: @run %>
+  <div data-drawer-target="background" <%= "inert" if @panel.present? %>>
+    <%= render "runs/run_header", run: @run %>
 
-  <section class="ap-workspace">
-    <aside class="ap-panel ap-workspace-sessions ap-border border-b lg:border-b-0 lg:border-r">
-      <%= render partial: "runs/session_sidebar", locals: @session_sidebar || Run.session_sidebar_locals(selected_run: @run) %>
-    </aside>
+    <section class="ap-workspace">
+      <aside class="ap-panel ap-workspace-sessions ap-border border-b lg:border-b-0 lg:border-r">
+        <%= render partial: "runs/session_sidebar", locals: @session_sidebar || Run.session_sidebar_locals(selected_run: @run) %>
+      </aside>
 
-    <aside class="ap-panel ap-workspace-lineage ap-border border-b lg:border-b-0 lg:border-r">
-      <%= render "runs/passport_tree", run: @run, selected_passport: @selected_passport, passport_tree: @passport_tree %>
-    </aside>
+      <aside class="ap-panel ap-workspace-lineage ap-border border-b lg:border-b-0 lg:border-r">
+        <%= render "runs/passport_tree", run: @run, selected_passport: @selected_passport, passport_tree: @passport_tree %>
+      </aside>
 
-    <section class="ap-panel ap-workspace-current-ask ap-focus-pane">
-      <%= render "runs/permission_inbox", run: @run %>
+      <section class="ap-panel ap-workspace-current-ask ap-focus-pane">
+        <%= render "runs/permission_inbox", run: @run %>
+      </section>
     </section>
-  </section>
+  </div>
 
   <% if @panel.present? %>
-    <aside class="ap-drawer ap-drawer-open" aria-label="<%= @panel == "audit" ? "Audit receipts" : "Passport inspector" %>">
-      <div class="ap-drawer-panel">
+    <aside class="ap-drawer ap-drawer-open" role="dialog" aria-modal="true" aria-labelledby="<%= @panel == "audit" ? "audit-drawer-title" : "passport-drawer-title" %>" data-drawer-target="dialog" data-action="keydown@window->drawer#handleKeydown">
+      <div class="ap-drawer-panel" tabindex="-1" data-drawer-target="panel">
         <div class="ap-drawer-topbar">
           <div class="flex items-center gap-2">
             <%= link_to "Passport", run_path(@run, passport_id: @selected_passport&.id, panel: "passport"), class: "ap-quiet-link #{@panel == "passport" ? "ap-quiet-link-active" : ""}" %>

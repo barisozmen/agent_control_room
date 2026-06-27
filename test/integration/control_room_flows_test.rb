@@ -83,14 +83,21 @@ class ControlRoomFlowsTest < ActionDispatch::IntegrationTest
 
     get run_path(run, passport_id: passport.id, panel: "passport")
     assert_response :success
-    assert_select ".ap-drawer"
+    assert_select "main[data-controller='drawer'][data-drawer-close-url-value='#{run_path(run, passport_id: passport.id)}']"
+    assert_select "[data-drawer-target='background'][inert]"
+    assert_select ".ap-drawer[role='dialog'][aria-modal='true'][aria-labelledby='passport-drawer-title'][data-drawer-target='dialog']"
+    assert_select ".ap-drawer-panel[tabindex='-1'][data-drawer-target='panel']"
+    assert_select "a.ap-quiet-link", text: "Passport"
+    assert_select "a.ap-quiet-link", text: "Receipts"
+    assert_select "a.ap-quiet-link", text: "Close"
     assert_select "turbo-frame#passport_detail"
-    assert_select "h2", text: "auth-reviewer"
+    assert_select "h2#passport-drawer-title", text: "auth-reviewer"
 
     get run_path(run, panel: "audit")
     assert_response :success
-    assert_select ".ap-drawer"
+    assert_select ".ap-drawer[role='dialog'][aria-modal='true'][aria-labelledby='audit-drawer-title']"
     assert_select "turbo-frame#audit_timeline"
+    assert_select "h2#audit-drawer-title", text: "Receipt drawer"
     assert_select "span", text: "actor.delegated"
   end
 
