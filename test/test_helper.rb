@@ -14,6 +14,13 @@ module ActiveSupport
     fixtures :all
 
     # Add more helper methods to be used by all tests here...
+    def require_node_for_bridge_tests!
+      skip "Node bridge tests intentionally skipped with SKIP_NODE_BRIDGE_TESTS=1" if ENV["SKIP_NODE_BRIDGE_TESTS"] == "1"
+
+      assert system("node", "--version", out: File::NULL, err: File::NULL),
+        "node is required for JavaScript bridge tests. Install Node, or set SKIP_NODE_BRIDGE_TESTS=1 for an intentional local opt-out."
+    end
+
     def demo_run
       RuntimeAdapters::OpencodeDemo.start!(project_path: Rails.root.to_s)
     end

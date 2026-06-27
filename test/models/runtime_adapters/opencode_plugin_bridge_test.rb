@@ -24,7 +24,7 @@ class RuntimeAdapters::OpencodePluginBridgeTest < ActiveSupport::TestCase
   end
 
   test "permission ask waits for rails decisions and denies on polling trouble" do
-    skip "node is not available" unless system("node", "--version", out: File::NULL, err: File::NULL)
+    require_node_for_bridge_tests!
 
     stdout, stderr, status = Open3.capture3(node_test_env, "node", "--input-type=module", "-", stdin_data: node_permission_bridge_test, chdir: Rails.root.to_s)
 

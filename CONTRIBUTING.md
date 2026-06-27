@@ -38,6 +38,8 @@ Run the full test suite:
 bin/rails test:all
 ```
 
+Node must be available for the JavaScript bridge tests. For an intentional local opt-out, run with `SKIP_NODE_BRIDGE_TESTS=1`.
+
 If your shell points Bundler at another repository:
 
 ```bash
