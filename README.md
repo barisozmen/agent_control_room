@@ -1,17 +1,15 @@
 # Agent Control Room
 
-Agent Control Room is a local control surface for coding agents.
-
-It observes agent sessions on your computer, shows the agent and subagent lineage, pauses risky tool actions for approval, lets you grant scoped authority, and records audit receipts for what happened.
-
+Observe agent sessions on your computer, inspect agent and subagent lineage, pause risky tool actions, approve or deny requests, grant scoped permissions, and review tamper-evident audit receipts.
 
 ![Agent Control Room showing OpenCode sessions, runtime lineage, passport authority, and receipts](.github/assets/agent-control-room-working.png)
 
-The v1 prototype is OpenCode-first: a Rails control room plus an OpenCode observer. The core model is runtime-neutral so Claude Code, Codex, or another CLI can plug in later through the same event contract.
+The v1 prototype is OpenCode-first: a Rails control room plus an OpenCode observer. The core model is runtime-neutral, and the app now has concrete demo launch adapters for OpenCode, Claude Code, and Codex through the same event contract.
 
 ## What It Does
 
 - Observes local OpenCode sessions from any project on this computer.
+- Starts scripted demo runs through OpenCode, Claude Code, or Codex adapters.
 - Shows the runtime lineage: owner, main agent, subagents, and nested subagents.
 - Attaches each visible actor to a run-scoped passport that describes effective authority.
 - Pauses gated tool actions until the user chooses `Allow once`, `Add to passport`, or `Deny`.
@@ -24,7 +22,7 @@ This is a local-first hackathon prototype.
 
 Run it on loopback for the demo. Do not expose the Rails control room on a LAN or public host without adding app authentication.
 
-V1 gates intent-level runtime permissions through OpenCode hooks. It is not an OS sandbox, a secret vault, or a hosted team administration product.
+V1 gates intent-level runtime permissions through OpenCode hooks. Claude Code and Codex currently use the shared launcher and observer contract; full per-tool permission bridges for those runtimes are the next adapter layer. This is not an OS sandbox, a secret vault, or a hosted team administration product.
 
 ## Quick Start
 
@@ -73,7 +71,7 @@ Baris
     +-- docs-writer
 ```
 
-Run it from the UI with `Start demo run`, or start the app first:
+Run it from the UI with an OpenCode, Claude Code, or Codex demo button, or start the app first:
 
 ```bash
 bin/setup --skip-server
@@ -86,10 +84,12 @@ Then open:
 bin/find_server_port --url
 ```
 
-The demo launcher expects `opencode` on `PATH`. To use another binary:
+The default demo launcher expects `opencode` on `PATH`. The UI also exposes Claude Code and Codex demo launchers. To use another binary:
 
 ```bash
 AGENT_PASSPORTS_OPENCODE=/path/to/opencode bin/dev
+AGENT_PASSPORTS_CLAUDE_CODE=/path/to/claude bin/dev
+AGENT_PASSPORTS_CODEX=/path/to/codex bin/dev
 ```
 
 To use another port:
@@ -108,7 +108,7 @@ Agent Control Room has three main pieces:
 - **Runtime adapters:** integrations that translate agent runtime events into the canonical event shape.
 - **Authorization model:** passports, grants, permission requests, tool actions, and audit events.
 
-OpenCode is the first adapter, not the product boundary. Runtime adapters submit canonical events such as:
+OpenCode is the first full permission-hook adapter, not the product boundary. Runtime adapters submit canonical events such as:
 
 - `session.started`
 - `actor.delegated`
@@ -136,6 +136,7 @@ env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH bin/rails test:all
 - `docs/requirements.md` - constraints and launch goals.
 - `docs/manifesto.md` - why this exists and what v1 refuses.
 - `docs/spec.md` - v1 features, routes, and adapter boundary.
+- `docs/runtime_adapters.md` - adapter interface and OpenCode/Claude Code/Codex plan.
 - `docs/DESIGN.md` - OpenCode-like light-mode UI system.
 - `docs/domain_model.md` - Rails model plan.
 - `docs/tech_stack.md` - stack choices and verification.
