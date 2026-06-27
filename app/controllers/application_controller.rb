@@ -1,15 +1,21 @@
 class ApplicationController < ActionController::Base
   BridgeUnauthorized = Class.new(StandardError)
+  INTERNAL_ROBOTS_DIRECTIVE = "noindex, nofollow"
 
   # Only allow modern browsers supporting webp images, web push, badges, import maps, CSS nesting, and CSS :has.
   allow_browser versions: :modern
 
   # Changes to the importmap will invalidate the etag for HTML responses
   stale_when_importmap_changes
+  before_action :set_internal_indexing_headers
 
   rescue_from BridgeUnauthorized, with: :render_bridge_unauthorized
 
   private
+
+  def set_internal_indexing_headers
+    response.set_header("X-Robots-Tag", INTERNAL_ROBOTS_DIRECTIVE)
+  end
 
   def authenticate_bridge_token!(run)
     token = request.headers["X-Agent-Passports-Bridge-Token"].presence || params[:bridge_token].presence
