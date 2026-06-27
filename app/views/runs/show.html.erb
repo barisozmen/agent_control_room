@@ -4,15 +4,15 @@
   <%= render "runs/run_header", run: @run %>
 
   <section class="ap-workspace">
-    <aside class="ap-panel ap-border border-b lg:border-b-0 lg:border-r">
+    <aside class="ap-panel ap-workspace-sessions ap-border border-b lg:border-b-0 lg:border-r">
       <%= render partial: "runs/session_sidebar", locals: @session_sidebar || Run.session_sidebar_locals(selected_run: @run) %>
     </aside>
 
-    <aside class="ap-panel ap-border border-b lg:border-b-0 lg:border-r">
+    <aside class="ap-panel ap-workspace-lineage ap-border border-b lg:border-b-0 lg:border-r">
       <%= render "runs/passport_tree", run: @run, selected_passport: @selected_passport, passport_tree: @passport_tree %>
     </aside>
 
-    <section class="ap-panel ap-focus-pane">
+    <section class="ap-panel ap-workspace-current-ask ap-focus-pane">
       <%= render "runs/permission_inbox", run: @run %>
     </section>
   </section>

@@ -516,6 +516,18 @@ a {
     min-height: 0;
   }
 
+  .ap-workspace-lineage {
+    order: 1;
+  }
+
+  .ap-workspace-current-ask {
+    order: 2;
+  }
+
+  .ap-workspace-sessions {
+    order: 3;
+  }
+
   .ap-focus-pane {
     min-height: 0;
   }
