@@ -6,7 +6,7 @@ It observes agent sessions on your computer, shows the agent and subagent lineag
 
 The v1 prototype is OpenCode-first: a Rails control room plus an OpenCode observer. The core model is runtime-neutral so Claude Code, Codex, or another CLI can plug in later through the same event contract.
 
-![Agent Control Room showing OpenCode sessions, runtime lineage, passport authority, and receipts](docs/images/agent-control-room-working.png)
+![Agent Control Room showing OpenCode sessions, runtime lineage, passport authority, and receipts](.github/assets/agent-control-room-working.png)
 
 ## What It Does
 
