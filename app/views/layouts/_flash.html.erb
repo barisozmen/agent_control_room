@@ -1,0 +1,13 @@
+<%= turbo_frame_tag "flash_messages", class: "ap-flash-region", data: { turbo_temporary: true } do %>
+  <% flash.each do |kind, messages| %>
+    <% Array(messages).each do |message| %>
+      <% next if message.blank? %>
+
+      <% flash_kind = kind.to_s %>
+      <div class="ap-flash ap-flash-<%= flash_kind %>" role="<%= flash_kind == "alert" ? "alert" : "status" %>">
+        <p class="ap-kicker"><%= flash_kind.humanize %></p>
+        <p class="ap-flash-message"><%= message %></p>
+      </div>
+    <% end %>
+  <% end %>
+<% end %>

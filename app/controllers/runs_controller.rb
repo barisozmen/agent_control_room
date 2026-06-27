@@ -8,7 +8,10 @@ class RunsController < ApplicationController
 
     redirect_to run_path(run)
   rescue ArgumentError => error
-    redirect_to root_path, alert: error.message
+    respond_to do |format|
+      format.html { redirect_to root_path, alert: error.message }
+      format.turbo_stream { render_flash_stream(:alert, error.message) }
+    end
   end
 
   def show

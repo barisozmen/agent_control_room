@@ -67,4 +67,41 @@ class PermissionDecisionsControllerTest < ActionDispatch::IntegrationTest
     assert_equal "allow_once", request.reload.decision
     assert_equal "allowed", request.tool_action.reload.status
   end
+
+  test "html duplicate decision shows alert after redirect" do
+    run = demo_run
+    request = run.permission_requests.pending.first
+    request.resolve!("allow_once")
+
+    post permission_request_decisions_path(request),
+      params: { decision: { scope: "deny" } }
+
+    assert_redirected_to run_path(run)
+
+    follow_redirect!
+
+    assert_response :success
+    assert_select "turbo-frame#flash_messages" do
+      assert_select "[role='alert']", text: /Permission request already resolved/
+    end
+  end
+
+  test "turbo stream duplicate decision replaces flash messages" do
+    run = demo_run
+    request = run.permission_requests.pending.first
+    request.resolve!("allow_once")
+
+    post permission_request_decisions_path(request),
+      params: { decision: { scope: "deny" } },
+      headers: { "Accept" => Mime[:turbo_stream].to_s }
+
+    assert_response :unprocessable_entity
+    assert_equal "text/vnd.turbo-stream.html", response.media_type
+    assert_includes response.body, %(target="flash_messages")
+    assert_select "turbo-stream[action='replace'][target='flash_messages']" do
+      assert_select "turbo-frame#flash_messages" do
+        assert_select "[role='alert']", text: /Permission request already resolved/
+      end
+    end
+  end
 end

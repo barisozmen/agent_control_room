@@ -36,6 +36,11 @@ class ApplicationController < ActionController::Base
     render json: { ok: false, error: error.message }, status: :unauthorized
   end
 
+  def render_flash_stream(kind, message, status: :unprocessable_entity)
+    flash.now[kind] = message
+    render turbo_stream: turbo_stream.replace("flash_messages", partial: "layouts/flash"), status: status
+  end
+
   def valid_run_bridge_token?(run)
     token = request.headers["X-Agent-Passports-Bridge-Token"].presence || params[:bridge_token].presence
     token.present? &&

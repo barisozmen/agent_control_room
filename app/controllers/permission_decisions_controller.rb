@@ -16,7 +16,7 @@ class PermissionDecisionsController < ApplicationController
     respond_to do |format|
       format.html { redirect_to run_path(@permission_request.run), alert: error.message }
       format.json { render json: { ok: false, error: error.message }, status: :unprocessable_entity }
-      format.turbo_stream { redirect_to run_path(@permission_request.run), alert: error.message }
+      format.turbo_stream { render_flash_stream(:alert, error.message) }
     end
   end
 
