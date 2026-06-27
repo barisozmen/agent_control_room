@@ -22,5 +22,13 @@ module ObservedOpencodeSessions
     def result
       delegate.result
     end
+
+    def audit_event
+      delegate.audit_event
+    end
+
+    def ui_changes
+      delegate.ui_changes
+    end
   end
 end

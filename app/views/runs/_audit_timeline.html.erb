@@ -6,53 +6,19 @@
           <p class="ap-kicker">audit timeline</p>
           <h2 class="ap-pane-title mt-1">Receipt drawer</h2>
         </div>
-        <p class="ap-mono text-xs ap-muted"><%= pluralize(audit_events.size, "event") %></p>
+        <p id="audit_timeline_count" class="ap-mono text-xs ap-muted"><%= render "runs/audit_timeline_count", audit_events_count: audit_events.size %></p>
       </div>
     </div>
 
     <div class="ap-scroll flex-1 overflow-auto">
-      <% if audit_events.any? %>
-        <ol class="divide-y divide-[rgba(8,0,0,0.10)]">
-          <% audit_events.each do |event| %>
-            <li id="<%= dom_id(event) %>" class="grid grid-cols-1 gap-2 px-4 py-3 transition-colors hover:bg-[var(--ap-bg-weak)] lg:grid-cols-[112px_1fr_112px] lg:items-start">
-              <div class="ap-mono text-xs ap-muted">
-                <%= event.occurred_at.strftime("%H:%M:%S") %>
-              </div>
-
-              <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-x-2 gap-y-1">
-                  <span class="ap-mono text-xs font-medium ap-text-strong"><%= event.event_kind %></span>
-                  <% if event.capability.present? %>
-                    <span class="ap-mono text-xs ap-muted"><%= event.capability %></span>
-                  <% end %>
-                </div>
-
-                <% if event.action_summary.present? %>
-                  <p class="mt-1 text-sm leading-5 ap-text-strong"><%= event.action_summary %></p>
-                <% end %>
-
-                <% if event.actor_lineage.present? %>
-                  <% if event.passport_id.present? %>
-                    <p class="ap-mono mt-1 truncate text-xs">
-                      <%= link_to event.actor_lineage, run_path(run, passport_id: event.passport_id, panel: "passport"), class: "ap-inline-link ap-muted", data: { turbo_frame: "_top" } %>
-                    </p>
-                  <% else %>
-                    <p class="ap-mono mt-1 truncate text-xs ap-muted"><%= event.actor_lineage %></p>
-                  <% end %>
-                <% end %>
-              </div>
-
-              <div class="ap-mono text-xs font-medium lg:text-right <%= result_text_classes(event.result) %>">
-                <%= event.decision.presence || event.result %>
-              </div>
-            </li>
-          <% end %>
-        </ol>
-      <% else %>
-        <div class="p-4">
+      <% if audit_events.empty? %>
+        <div id="audit_timeline_empty_state" class="p-4">
           <p class="ap-empty">no receipts yet</p>
         </div>
       <% end %>
+      <ol id="audit_event_list" class="divide-y divide-[rgba(8,0,0,0.10)]">
+        <%= render partial: "runs/audit_event", collection: audit_events, as: :event, locals: { run: run } %>
+      </ol>
     </div>
   </div>
 <% end %>

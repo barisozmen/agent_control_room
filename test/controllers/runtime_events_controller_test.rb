@@ -5,7 +5,7 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
     run = create_run
     root = create_passport(run: run, actor_ref: "baris", actor_name: "Baris", actor_kind: "human", provider: "local")
 
-    assert_turbo_stream_broadcasts run, count: 6 do
+    streams = capture_turbo_stream_broadcasts(run) do
       assert_difference -> { run.passports.count }, 1 do
         post_runtime_event(run, {
           event_id: "test-event-1",
@@ -28,6 +28,14 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
     end
 
     assert_response :created
+    assert_runtime_streams streams, [
+      [ "append", "audit_event_list" ],
+      [ "update", "audit_timeline_count" ],
+      [ "remove", "audit_timeline_empty_state" ],
+      [ "replace", "run_header" ],
+      [ "replace", "passport_tree" ],
+      [ "replace", "passport_detail" ]
+    ]
     assert_equal "Passport", JSON.parse(response.body).fetch("type")
     assert_equal "opencode/main-agent", run.passports.find_by!(actor_ref: "main-agent").actor_name
   end
@@ -37,19 +45,30 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
     root = create_passport(run: run, actor_ref: "baris", actor_name: "Baris", actor_kind: "human", provider: "local")
     agent = create_passport(run: run, actor_ref: "main-agent", actor_name: "opencode/main-agent", parent: root, rules: { bash: "ask" })
 
-    post_runtime_event(run, {
-      event_id: "bridge-tool-1",
-      type: "tool.requested",
-      actor_ref: agent.actor_ref,
-      capability: "bash",
-      action_kind: "bash",
-      action_summary: "bash: bundle exec rails test",
-      command: "bundle exec rails test",
-      risk_level: "medium",
-      risk_summary: "Runs test suite"
-    })
+    streams = capture_turbo_stream_broadcasts(run) do
+      post_runtime_event(run, {
+        event_id: "bridge-tool-1",
+        type: "tool.requested",
+        actor_ref: agent.actor_ref,
+        capability: "bash",
+        action_kind: "bash",
+        action_summary: "bash: bundle exec rails test",
+        command: "bundle exec rails test",
+        risk_level: "medium",
+        risk_summary: "Runs test suite"
+      })
+    end
 
     assert_response :created
+    assert_runtime_streams streams, [
+      [ "append", "audit_event_list" ],
+      [ "update", "audit_timeline_count" ],
+      [ "remove", "audit_timeline_empty_state" ],
+      [ "replace", "session_sidebar" ],
+      [ "replace", "run_header" ],
+      [ "replace", "permission_inbox" ],
+      [ "replace", "passport_detail" ]
+    ]
     body = JSON.parse(response.body)
     assert_equal "ToolAction", body.fetch("type")
     assert_equal "asking", body.fetch("status")
@@ -167,6 +186,32 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal [ "rails -v", "ruby -v" ], run.tool_actions.where(source_event_id: nil).order(:command).pluck(:command)
     assert_equal 2, run.audit_events.where(event_kind: "tool.allowed", source_event_id: nil).count
+  end
+
+  test "allowed tool request only appends a receipt and refreshes passport detail" do
+    run = create_run
+    root = create_passport(run: run, actor_ref: "baris", actor_name: "Baris", actor_kind: "human", provider: "local")
+    agent = create_passport(run: run, actor_ref: "main-agent", actor_name: "opencode/main-agent", parent: root, rules: { bash: "allow" })
+
+    streams = capture_turbo_stream_broadcasts(run) do
+      post_runtime_event(run, {
+        event_id: "allowed-tool-request",
+        type: "tool.requested",
+        actor_ref: agent.actor_ref,
+        capability: "bash",
+        action_kind: "bash",
+        action_summary: "bash: ruby -v",
+        command: "ruby -v"
+      })
+    end
+
+    assert_response :created
+    assert_runtime_streams streams, [
+      [ "append", "audit_event_list" ],
+      [ "update", "audit_timeline_count" ],
+      [ "remove", "audit_timeline_empty_state" ],
+      [ "replace", "passport_detail" ]
+    ]
   end
 
   test "duplicate tool request event does not reopen a resolved permission request" do
@@ -296,19 +341,26 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
     action = run.tool_actions.find_by!(source_event_id: "finish-request")
     assert_equal "allowed", action.status
 
-    post_runtime_event(run, {
-      event_id: "finish-terminal",
-      source_event_id: "finish-request",
-      type: "tool.finished",
-      actor_ref: agent.actor_ref,
-      capability: "bash",
-      action_kind: "bash",
-      action_summary: "bash finished",
-      command: "ruby -v",
-      exit_status: 0
-    })
+    streams = capture_turbo_stream_broadcasts(run) do
+      post_runtime_event(run, {
+        event_id: "finish-terminal",
+        source_event_id: "finish-request",
+        type: "tool.finished",
+        actor_ref: agent.actor_ref,
+        capability: "bash",
+        action_kind: "bash",
+        action_summary: "bash finished",
+        command: "ruby -v",
+        exit_status: 0
+      })
+    end
 
     assert_response :created
+    assert_runtime_streams streams, [
+      [ "append", "audit_event_list" ],
+      [ "update", "audit_timeline_count" ],
+      [ "replace", "passport_detail" ]
+    ]
     assert_equal "finished", action.reload.status
     assert_equal 0, action.exit_status
     assert run.audit_events.where(event_kind: "tool.finished", result: "finished").exists?
@@ -374,6 +426,28 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
     assert run.audit_events.where(event_kind: "tool.blocked", result: "blocked").exists?
   end
 
+  test "session finished event updates status targets without replacing all panes" do
+    run = create_run
+
+    streams = capture_turbo_stream_broadcasts(run) do
+      post_runtime_event(run, {
+        event_id: "session-finished-minimal-broadcast",
+        type: "session.finished",
+        status: "completed"
+      })
+    end
+
+    assert_response :created
+    assert_runtime_streams streams, [
+      [ "append", "audit_event_list" ],
+      [ "update", "audit_timeline_count" ],
+      [ "remove", "audit_timeline_empty_state" ],
+      [ "replace", "session_sidebar" ],
+      [ "replace", "run_header" ]
+    ]
+    assert_equal "completed", run.reload.status
+  end
+
   private
 
   def post_tool_requested(run:, actor_ref:, event_id:, command:, suggested_pattern: nil)
@@ -396,5 +470,14 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
       params: { runtime_event: event.merge(run_id: run.id) },
       headers: bridge_headers(run),
       as: :json
+  end
+
+  def assert_runtime_streams(streams, expected)
+    actual = streams.map { |stream| [ stream["action"], stream["target"] ] }
+
+    assert_equal expected.sort, actual.sort
+    refute_includes actual.map(&:last), "audit_timeline"
+    refute_includes actual.map(&:last), "permission_inbox", "permission inbox should only stream when pending asks change" unless expected.any? { |(_, target)| target == "permission_inbox" }
+    refute_includes actual.map(&:last), "session_sidebar", "session sidebar should only stream when status or pending counts change" unless expected.any? { |(_, target)| target == "session_sidebar" }
   end
 end
