@@ -18,9 +18,49 @@
       <% if active_request.present? %>
         <%= render active_request %>
       <% else %>
-        <div class="ap-empty">
-          <p>no pending asks</p>
-          <p class="mt-2"><%= link_to "Open receipts", run_path(run, panel: "audit"), class: "ap-inline-link", data: { turbo_frame: "_top" } %> for the completed permission story.</p>
+        <% last_decision = run.permission_requests.resolved.includes(:passport, :tool_action).first %>
+        <% idle_summary = last_decision.present? ? "All permission asks are resolved." : "Waiting for the first permission ask." %>
+        <div class="ap-empty space-y-4" data-testid="permission-inbox-idle">
+          <div>
+            <p class="ap-kicker">idle</p>
+            <p class="mt-1 text-sm leading-5 ap-text-strong"><%= idle_summary %></p>
+          </div>
+
+          <% if last_decision.present? %>
+            <% decision_label = case last_decision.decision
+              when "allow_once" then "Allowed once"
+              when "passport_grant" then "Added to passport"
+              when "deny" then "Denied"
+              else last_decision.decision.to_s.humanize
+            end %>
+            <% decision_result = last_decision.decision == "deny" ? "denied" : "allowed" %>
+
+            <div class="border-t border-[rgba(8,0,0,0.10)] pt-3">
+              <p class="ap-kicker">last decision</p>
+              <p class="mt-2 text-sm leading-5 ap-text-strong">
+                <span class="<%= result_text_classes(decision_result) %>"><%= decision_label %></span>
+                for <%= last_decision.passport.actor_name %>
+              </p>
+              <% if last_decision.tool_action.action_summary.present? %>
+                <p class="mt-1 text-sm leading-5 ap-body-muted"><%= last_decision.tool_action.action_summary %></p>
+              <% end %>
+            </div>
+          <% else %>
+            <p class="border-t border-[rgba(8,0,0,0.10)] pt-3 text-sm leading-5 ap-body-muted">No decision has been recorded yet. This inbox will update when the run asks for authority.</p>
+          <% end %>
+
+          <div class="border-t border-[rgba(8,0,0,0.10)] pt-3">
+            <p class="ap-kicker">run status</p>
+            <p class="mt-2 inline-flex items-center gap-2 text-sm leading-5 ap-text-strong">
+              <span class="ap-status-dot <%= status_dot_classes(run.status) %>"></span>
+              <%= run.status %>
+            </p>
+          </div>
+
+          <div class="flex flex-col gap-2 border-t border-[rgba(8,0,0,0.10)] pt-3 sm:flex-row sm:items-center">
+            <%= link_to "Open receipts", run_path(run, panel: "audit"), class: command_button_classes(:primary), data: { turbo_frame: "_top" } %>
+            <span class="text-sm leading-5 ap-body-muted">Review the completed permission story.</span>
+          </div>
         </div>
       <% end %>
     </div>

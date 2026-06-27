@@ -30,11 +30,20 @@ class CommunityDemoBrowserSystemTest < ApplicationSystemTestCase
     assert_equal stable_url, current_url
 
     decide_current_ask "Deny"
-    assert_selector "turbo-frame#permission_inbox", text: "No pending asks"
+    within("turbo-frame#permission_inbox") do
+      assert_text "No pending asks"
+      assert_text "All permission asks are resolved."
+      assert_text(/last decision/i)
+      assert_text "Denied"
+      assert_text(/run status/i)
+      assert_text "completed"
+    end
     assert_selector "turbo-frame#run_header", text: "completed"
     assert_equal stable_url, current_url
 
-    click_link "Receipts"
+    within("turbo-frame#permission_inbox") do
+      click_link "Open receipts"
+    end
 
     assert_selector "turbo-frame#audit_timeline", text: "session.finished"
     assert_selector "turbo-frame#audit_timeline", text: "permission.decided"

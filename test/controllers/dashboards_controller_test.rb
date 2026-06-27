@@ -30,6 +30,7 @@ class DashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_select "span", text: "2 passports"
     assert_select "span", text: "opencode/main-agent"
     assert_select "h2", text: "No pending asks"
+    assert_select "[data-testid='permission-inbox-idle']", text: /Waiting for the first permission ask/
     assert_select "a[href='#{run_path(run, panel: "audit")}']", text: "Receipts"
   end
 
