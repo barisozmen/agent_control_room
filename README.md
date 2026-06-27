@@ -6,24 +6,6 @@ Observe agent sessions on your computer, inspect agent and subagent lineage, pau
 
 The v1 prototype is OpenCode-first: a Rails control room plus an OpenCode observer. The core model is runtime-neutral, and the app now has concrete demo launch adapters for OpenCode, Claude Code, and Codex through the same event contract.
 
-## What It Does
-
-- Observes local OpenCode sessions from any project on this computer.
-- Starts scripted demo runs through OpenCode, Claude Code, or Codex adapters.
-- Shows the runtime lineage: owner, main agent, subagents, and nested subagents.
-- Attaches each visible actor to a run-scoped passport that describes effective authority.
-- Pauses gated tool actions until the user chooses `Allow once`, `Add to passport`, or `Deny`.
-- Persists scoped grants so repeated safe actions can proceed without vague blanket approval.
-- Records receipts for delegation, tool requests, decisions, grants, denials, and completions.
-
-## Status
-
-This is a local-first hackathon prototype.
-
-Run it on loopback for the demo. Do not expose the Rails control room on a LAN or public host without adding app authentication.
-
-V1 gates intent-level runtime permissions through OpenCode hooks. Claude Code and Codex currently use the shared launcher and observer contract; full per-tool permission bridges for those runtimes are the next adapter layer. This is not an OS sandbox, a secret vault, or a hosted team administration product.
-
 ## Quick Start
 
 Install dependencies and start the local control room:
@@ -48,6 +30,32 @@ bin/find_server_port --url
 Then start `opencode` from any project on this computer. The session appears in the left sidebar. Click a session to inspect its lineage, current ask, passport details, and receipts.
 
 The observer is fail-open when the Rails app is offline, so stopping Agent Control Room does not break normal OpenCode usage.
+
+## Contributor Quick Start
+
+1. Read `docs/runtime_adapters.md` to understand the runtime-neutral event boundary.
+2. Run `bin/setup --skip-server` and `bin/dev`.
+3. Open the local URL from `bin/find_server_port --url`.
+4. Run `bin/rails test:all` before opening a PR.
+5. Keep runtime-specific work inside adapters, not the passport or authorization core.
+
+## What It Does
+
+- Observes local OpenCode sessions from any project on this computer.
+- Starts scripted demo runs through OpenCode, Claude Code, or Codex adapters.
+- Shows the runtime lineage: owner, main agent, subagents, and nested subagents.
+- Attaches each visible actor to a run-scoped passport that describes effective authority.
+- Pauses gated tool actions until the user chooses `Allow once`, `Add to passport`, or `Deny`.
+- Persists scoped grants so repeated safe actions can proceed without vague blanket approval.
+- Records receipts for delegation, tool requests, decisions, grants, denials, and completions.
+
+## Status
+
+This is a local-first hackathon prototype.
+
+Run it on loopback for the demo. Do not expose the Rails control room on a LAN or public host without adding app authentication.
+
+V1 gates intent-level runtime permissions through OpenCode hooks. Claude Code and Codex currently use the shared launcher and observer contract; full per-tool permission bridges for those runtimes are the next adapter layer. This is not an OS sandbox, a secret vault, or a hosted team administration product.
 
 ## Permission Decisions
 

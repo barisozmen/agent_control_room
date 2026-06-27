@@ -1,6 +1,6 @@
 # Agent Passports
 
-Agent Passports is a local Rails control room for opencode agent runs, passport hierarchy, permission requests, scoped grants, and audit receipts.
+Agent Passports is a local Rails control room for coding-agent runs, passport hierarchy, permission requests, scoped grants, and audit receipts. OpenCode is the first full bridge; Claude Code and Codex use the shared runtime adapter boundary.
 
 ## Source Of Truth
 
