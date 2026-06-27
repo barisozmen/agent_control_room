@@ -26,7 +26,7 @@ class DashboardsControllerTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#session_sidebar"
     assert_select "turbo-frame#passport_tree"
     assert_select "turbo-frame#permission_inbox"
-    assert_select "span", text: "running"
+    assert_select "span", text: "Status: running"
     assert_select "span", text: "2 passports"
     assert_select "span", text: "opencode/main-agent"
     assert_select "h2", text: "No pending asks"
