@@ -73,8 +73,14 @@ class RuntimeAdapters::OpencodeObserverPluginTest < ActiveSupport::TestCase
       enqueueResponses(response({ status: "running", run_id: 9 }))
       await plugin.event({
         event: {
-          sessionID: "session-observer",
           type: "session.updated",
+          properties: {
+            info: {
+              id: "session-observer",
+              directory: "/tmp/project",
+              title: "project",
+            },
+          },
           apiToken: "secret-token",
         },
       })
@@ -87,8 +93,31 @@ class RuntimeAdapters::OpencodeObserverPluginTest < ActiveSupport::TestCase
       assert.equal(calls[0].body.opencode_event.canonical_payload.hook, "session")
       assert.equal(calls[0].body.opencode_event.canonical_payload.event.apiToken, "[redacted]")
 
-      await plugin.event({ event: { sessionID: "session-observer", type: "session.updated" } })
+      await plugin.event({ event: { type: "session.updated", properties: { info: { id: "session-observer" } } } })
       assert.equal(calls.length, 1)
+
+      enqueueResponses(response({ status: "minted", run_id: 9 }))
+      await plugin.event({
+        event: {
+          type: "session.updated",
+          properties: {
+            info: {
+              id: "child-session",
+              parentID: "session-observer",
+              directory: "/tmp/project",
+              title: "Explore sidebar session rendering (@explore subagent)",
+            },
+          },
+        },
+      })
+
+      assert.equal(calls.length, 2)
+      assertOpencodePost(calls[1], "actor.delegated")
+      assert.equal(calls[1].body.opencode_event.event_id, "opencode-observed-session-observer-child-session-delegated")
+      assert.equal(calls[1].body.opencode_event.actor_ref, "opencode-session-child-session")
+      assert.equal(calls[1].body.opencode_event.parent_actor_ref, "main-agent")
+      assert.equal(calls[1].body.opencode_event.actor_name, "opencode/explore")
+      assert.equal(calls[1].body.opencode_event.task, "Explore sidebar session rendering (@explore subagent)")
 
       enqueueResponses(
         response({ status: "asking", permission_request_id: 11, permission_request_url: "http://rails.test/permission_requests/11" }),
@@ -97,24 +126,26 @@ class RuntimeAdapters::OpencodeObserverPluginTest < ActiveSupport::TestCase
 
       const output = {}
       await plugin["permission.ask"]({
-        sessionID: "session-observer",
+        sessionID: "child-session",
         callID: "call-observer",
-        agent: "main-agent",
         type: "bash",
         title: "Run tests",
         pattern: "bin/rails test",
       }, output)
 
       assert.equal(output.status, "allow")
-      assertOpencodePost(calls[1], "tool.requested")
-      assert.equal(calls[1].body.opencode_event.session_id, "session-observer")
-      assert.equal(calls[1].body.opencode_event.event_id, "opencode-observed-session-observer-call-observer-requested")
-      assert.equal(calls[1].body.opencode_event.command, "bin/rails test")
-      assert.equal(calls[1].body.opencode_event.canonical_payload.hook, "permission.ask")
-      assert.equal(calls[2].url, "http://rails.test/permission_requests/11")
-      assert.equal(calls[2].method, "GET")
-      assert.equal(calls[2].headers["accept"], "application/json")
-      assert.equal(calls[2].headers["x-agent-passports-machine-token"], "machine-test-token")
+      assertOpencodePost(calls[2], "tool.requested")
+      assert.equal(calls[2].body.opencode_event.session_id, "session-observer")
+      assert.equal(calls[2].body.opencode_event.actor_ref, "opencode-session-child-session")
+      assert.equal(calls[2].body.opencode_event.actor_name, "opencode/explore")
+      assert.equal(calls[2].body.opencode_event.parent_actor_ref, "main-agent")
+      assert.equal(calls[2].body.opencode_event.event_id, "opencode-observed-session-observer-call-observer-requested")
+      assert.equal(calls[2].body.opencode_event.command, "bin/rails test")
+      assert.equal(calls[2].body.opencode_event.canonical_payload.hook, "permission.ask")
+      assert.equal(calls[3].url, "http://rails.test/permission_requests/11")
+      assert.equal(calls[3].method, "GET")
+      assert.equal(calls[3].headers["accept"], "application/json")
+      assert.equal(calls[3].headers["x-agent-passports-machine-token"], "machine-test-token")
 
       enqueueResponses(response({ status: "denied" }))
       await assert.rejects(
@@ -128,11 +159,11 @@ class RuntimeAdapters::OpencodeObserverPluginTest < ActiveSupport::TestCase
         /Agent Identity Control Room denied this tool call/
       )
 
-      assertOpencodePost(calls[3], "tool.requested")
-      assert.equal(calls[3].body.opencode_event.event_id, "opencode-observed-session-observer-call-before-requested")
-      assert.equal(calls[3].body.opencode_event.capability, "bash")
-      assert.equal(calls[3].body.opencode_event.command, "bin/rails db:migrate")
-      assert.equal(calls[3].body.opencode_event.canonical_payload.hook, "tool.execute.before")
+      assertOpencodePost(calls[4], "tool.requested")
+      assert.equal(calls[4].body.opencode_event.event_id, "opencode-observed-session-observer-call-before-requested")
+      assert.equal(calls[4].body.opencode_event.capability, "bash")
+      assert.equal(calls[4].body.opencode_event.command, "bin/rails db:migrate")
+      assert.equal(calls[4].body.opencode_event.canonical_payload.hook, "tool.execute.before")
 
       enqueueResponses(response({ status: "finished" }))
       await plugin["tool.execute.after"]({
@@ -146,25 +177,25 @@ class RuntimeAdapters::OpencodeObserverPluginTest < ActiveSupport::TestCase
         exitCode: 0,
       })
 
-      assertOpencodePost(calls[4], "tool.finished")
-      assert.equal(calls[4].body.opencode_event.event_id, "opencode-observed-session-observer-call-after-finished")
-      assert.equal(calls[4].body.opencode_event.source_event_id, "opencode-observed-session-observer-call-after-requested")
-      assert.equal(calls[4].body.opencode_event.capability, "edit")
-      assert.equal(calls[4].body.opencode_event.path, "app/models/run.rb")
-      assert.equal(calls[4].body.opencode_event.exit_status, 0)
-      assert.equal(calls[4].body.opencode_event.action_summary, "Edit finished")
-      assert.equal(calls[4].body.opencode_event.canonical_payload.hook, "tool.execute.after")
+      assertOpencodePost(calls[5], "tool.finished")
+      assert.equal(calls[5].body.opencode_event.event_id, "opencode-observed-session-observer-call-after-finished")
+      assert.equal(calls[5].body.opencode_event.source_event_id, "opencode-observed-session-observer-call-after-requested")
+      assert.equal(calls[5].body.opencode_event.capability, "edit")
+      assert.equal(calls[5].body.opencode_event.path, "app/models/run.rb")
+      assert.equal(calls[5].body.opencode_event.exit_status, 0)
+      assert.equal(calls[5].body.opencode_event.action_summary, "Edit finished")
+      assert.equal(calls[5].body.opencode_event.canonical_payload.hook, "tool.execute.after")
 
       enqueueResponses(response({ status: "completed" }))
       await plugin.dispose()
 
-      assertOpencodePost(calls[5], "session.finished")
-      assert.equal(calls[5].body.opencode_event.event_id, "opencode-observed-session-observer-session-finished")
-      assert.equal(calls[5].body.opencode_event.status, "completed")
-      assert.equal(calls[5].body.opencode_event.title, "project")
-      assert.equal(calls[5].body.opencode_event.project_path, "/tmp/project")
+      assertOpencodePost(calls[6], "session.finished")
+      assert.equal(calls[6].body.opencode_event.event_id, "opencode-observed-session-observer-session-finished")
+      assert.equal(calls[6].body.opencode_event.status, "completed")
+      assert.equal(calls[6].body.opencode_event.title, "project")
+      assert.equal(calls[6].body.opencode_event.project_path, "/tmp/project")
 
-      assert.equal(calls.length, 6)
+      assert.equal(calls.length, 7)
       assert.equal(queuedResponses.length, 0)
     JAVASCRIPT
   end

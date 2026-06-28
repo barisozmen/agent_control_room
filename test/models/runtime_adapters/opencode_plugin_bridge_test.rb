@@ -11,8 +11,12 @@ class RuntimeAdapters::OpencodePluginBridgeTest < ActiveSupport::TestCase
 
     plugin = plugin_path.read
     assert_includes plugin, '"permission.ask"'
+    assert_includes plugin, "event: async"
     assert_includes plugin, '"tool.execute.before"'
     assert_includes plugin, '"tool.execute.after"'
+    assert_includes plugin, "actor.delegated"
+    assert_includes plugin, "parent_actor_ref"
+    assert_includes plugin, "actor_name"
     assert_includes plugin, "AGENT_PASSPORTS_RUN_ID"
     assert_includes plugin, "AGENT_PASSPORTS_BRIDGE_TOKEN"
     assert_includes plugin, "AGENT_PASSPORTS_RUNTIME_EVENTS_URL"
@@ -95,6 +99,40 @@ class RuntimeAdapters::OpencodePluginBridgeTest < ActiveSupport::TestCase
 
         return output.status
       }
+
+      const childCalls = []
+      globalThis.fetch = fetchFrom([ response({ status: "minted" }) ], childCalls)
+      await plugin.event({
+        event: {
+          type: "session.updated",
+          properties: {
+            info: {
+              id: "child-session",
+              parentID: "session-1",
+              title: "Explore sidebar session rendering (@explore subagent)",
+            },
+          },
+        },
+      })
+
+      assert.equal(childCalls.length, 1)
+      assert.equal(childCalls[0].method, "POST")
+      assert.equal(childCalls[0].body.runtime_event.type, "actor.delegated")
+      assert.equal(childCalls[0].body.runtime_event.session_id, "session-1")
+      assert.equal(childCalls[0].body.runtime_event.event_id, "opencode-test-run-session-1-child-session-delegated")
+      assert.equal(childCalls[0].body.runtime_event.actor_ref, "opencode-session-child-session")
+      assert.equal(childCalls[0].body.runtime_event.parent_actor_ref, "main-agent")
+      assert.equal(childCalls[0].body.runtime_event.actor_name, "opencode/explore")
+
+      const childToolCalls = []
+      assert.equal(await askWith(fetchFrom([ response({ status: "allowed" }) ], childToolCalls), {
+        sessionID: "child-session",
+        agent: undefined,
+      }), "allow")
+      assert.equal(childToolCalls[0].body.runtime_event.session_id, "session-1")
+      assert.equal(childToolCalls[0].body.runtime_event.actor_ref, "opencode-session-child-session")
+      assert.equal(childToolCalls[0].body.runtime_event.actor_name, "opencode/explore")
+      assert.equal(childToolCalls[0].body.runtime_event.parent_actor_ref, "main-agent")
 
       assert.equal(await askWith(fetchFrom([ response({ status: "allowed" }) ])), "allow")
       assert.equal(await askWith(fetchFrom([ response({ status: "finished" }) ])), "allow")

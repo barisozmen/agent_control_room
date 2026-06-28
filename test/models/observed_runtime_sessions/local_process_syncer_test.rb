@@ -93,10 +93,71 @@ class ObservedRuntimeSessions::LocalProcessSyncerTest < ActiveSupport::TestCase
     assert_equal "opencode/main-agent", run.passports.find_by!(actor_ref: "main-agent").actor_name
   end
 
-  test "default scanners include opencode session logs" do
+  test "imports opencode child session delegations into the parent session lineage" do
+    started_at = Time.zone.parse("2026-06-27 19:03:41 UTC")
+    root_event = runtime_event(
+      pid: nil,
+      session_id: "opencode-root-session",
+      title: "OpenCode root",
+      started_at: started_at,
+      occurred_at: started_at,
+      last_seen_at: started_at
+    ).merge(runtime_name: "opencode")
+    child_event = {
+      runtime_name: "opencode",
+      type: "actor.delegated",
+      event_id: "opencode-session-log-child-delegated",
+      session_id: "opencode-root-session",
+      title: "OpenCode root",
+      project_path: Rails.root.to_s,
+      actor_ref: "opencode-session-child",
+      parent_actor_ref: "main-agent",
+      actor_name: "opencode/explore",
+      actor_kind: "agent",
+      provider: "opencode",
+      task: "Explore repo (@explore subagent)",
+      rules: { read: "allow", edit: "ask", bash: "ask", web: "ask", delegate: "ask" },
+      started_at: started_at.iso8601,
+      last_seen_at: (started_at + 1.minute).iso8601,
+      occurred_at: (started_at + 30.seconds).iso8601
+    }
+    nested_event = child_event.merge(
+      event_id: "opencode-session-log-nested-delegated",
+      actor_ref: "opencode-session-nested",
+      parent_actor_ref: "opencode-session-child",
+      actor_name: "opencode/review",
+      task: "Review repo (@review subagent)"
+    )
+
+    ObservedRuntimeSessions::LocalProcessSyncer.sync!(
+      scanners: [ FakeScanner.new([ root_event, child_event, nested_event ]) ]
+    )
+
+    run = Run.find_by!(runtime_name: "opencode", runtime_session_id: "opencode-root-session")
+    main_agent = run.passports.find_by!(actor_ref: "main-agent")
+    child = run.passports.find_by!(actor_ref: "opencode-session-child")
+    nested = run.passports.find_by!(actor_ref: "opencode-session-nested")
+
+    assert_equal main_agent, child.parent
+    assert_equal child, nested.parent
+    assert_equal [ "opencode/main-agent", "opencode/explore", "opencode/review" ], nested.lineage.drop(1).map(&:actor_name)
+    assert_equal 1, Run.where(runtime_name: "opencode", runtime_session_id: "opencode-root-session").count
+
+    assert_no_difference -> { run.passports.reload.count } do
+      assert_no_difference -> { run.audit_events.reload.count } do
+        ObservedRuntimeSessions::LocalProcessSyncer.sync!(
+          scanners: [ FakeScanner.new([ root_event, child_event, nested_event ]) ]
+        )
+      end
+    end
+  end
+
+  test "default scanners include opencode and pi session observers" do
     scanner_classes = ObservedRuntimeSessions::LocalProcessSyncer.new.send(:default_scanners).map(&:class)
 
     assert_includes scanner_classes, RuntimeAdapters::OpencodeSessionLogScanner
+    assert_includes scanner_classes, RuntimeAdapters::PiProcessScanner
+    assert_includes scanner_classes, RuntimeAdapters::PiSessionLogScanner
   end
 
   test "sync_if_stale skips scanner work inside the ttl" do
