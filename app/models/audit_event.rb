@@ -10,7 +10,7 @@ class AuditEvent < ApplicationRecord
     end
   end
 
-  belongs_to :run
+  belongs_to :run, counter_cache: true
   belongs_to :passport, optional: true
   belongs_to :tool_action, optional: true
   belongs_to :permission_request, optional: true
@@ -29,7 +29,7 @@ class AuditEvent < ApplicationRecord
   }
 
   def self.timeline_page_for(run, before_id: nil, limit: TIMELINE_PAGE_SIZE)
-    total_count = run.audit_events.count
+    total_count = run.audit_events_count
     cursor = run.audit_events.find_by(id: before_id) if before_id.present?
     relation = cursor.present? ? run.audit_events.before_timeline_event(cursor) : run.audit_events
     newest_first = relation.recent_for_timeline(limit).to_a

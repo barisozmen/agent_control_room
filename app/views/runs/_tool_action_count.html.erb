@@ -1,0 +1,5 @@
+<% if visible_count == total_count %>
+  <%= pluralize(total_count, "action") %>
+<% else %>
+  <%= visible_count %> of <%= pluralize(total_count, "action") %>
+<% end %>

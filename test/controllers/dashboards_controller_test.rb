@@ -1,6 +1,18 @@
 require "test_helper"
 
 class DashboardsControllerTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
+  test "show enqueues local runtime sync without calling the syncer inline" do
+    with_syncer_replaced_by(-> { raise "syncer should run from the job, not the request" }) do
+      assert_enqueued_with(job: ObservedRuntimeSessions::LocalProcessSyncJob) do
+        get root_path
+      end
+    end
+
+    assert_response :success
+  end
+
   test "shows the start panel when no run exists" do
     get root_path
 
@@ -128,5 +140,15 @@ class DashboardsControllerTest < ActionDispatch::IntegrationTest
         assert_select ".ap-session-row-selected[href='#{run_path(killed)}']", text: /Killed investigation/
       end
     end
+  end
+
+  private
+
+  def with_syncer_replaced_by(replacement)
+    original = ObservedRuntimeSessions::LocalProcessSyncer.method(:sync_if_stale!)
+    ObservedRuntimeSessions::LocalProcessSyncer.define_singleton_method(:sync_if_stale!, replacement)
+    yield
+  ensure
+    ObservedRuntimeSessions::LocalProcessSyncer.define_singleton_method(:sync_if_stale!, original)
   end
 end

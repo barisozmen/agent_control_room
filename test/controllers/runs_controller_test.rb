@@ -1,6 +1,20 @@
 require "test_helper"
 
 class RunsControllerTest < ActionDispatch::IntegrationTest
+  include ActiveJob::TestHelper
+
+  test "show enqueues local runtime sync without calling the syncer inline" do
+    run = create_run
+
+    with_syncer_replaced_by(-> { raise "syncer should run from the job, not the request" }) do
+      assert_enqueued_with(job: ObservedRuntimeSessions::LocalProcessSyncJob) do
+        get run_path(run)
+      end
+    end
+
+    assert_response :success
+  end
+
   test "start demo run redirects to control room with hierarchy and asks" do
     assert_difference -> { Run.count }, 1 do
       post runs_path
@@ -104,5 +118,15 @@ class RunsControllerTest < ActionDispatch::IntegrationTest
     assert_select "a.ap-passport-node[href='#{run_path(run, passport_id: owner.id, panel: "passport")}'][aria-current]", count: 0
     assert_select "turbo-frame#run_header .ap-status-text", text: "Status: running"
     assert_select "turbo-frame#passport_detail .ap-status-text", text: /Status: active/
+  end
+
+  private
+
+  def with_syncer_replaced_by(replacement)
+    original = ObservedRuntimeSessions::LocalProcessSyncer.method(:sync_if_stale!)
+    ObservedRuntimeSessions::LocalProcessSyncer.define_singleton_method(:sync_if_stale!, replacement)
+    yield
+  ensure
+    ObservedRuntimeSessions::LocalProcessSyncer.define_singleton_method(:sync_if_stale!, original)
   end
 end

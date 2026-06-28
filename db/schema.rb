@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_06_27_181000) do
+ActiveRecord::Schema[8.1].define(version: 2026_06_28_004630) do
   create_table "audit_events", force: :cascade do |t|
     t.text "action_summary"
     t.string "actor_lineage"
@@ -69,6 +69,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_181000) do
     t.string "web_rule", null: false
     t.index ["parent_id"], name: "index_passports_on_parent_id"
     t.index ["run_id", "actor_ref"], name: "index_passports_on_run_id_and_actor_ref", unique: true
+    t.index ["run_id", "created_at", "id"], name: "index_passports_on_run_created_id"
     t.index ["run_id", "status"], name: "index_passports_on_run_id_and_status"
     t.index ["run_id"], name: "index_passports_on_run_id"
   end
@@ -89,28 +90,35 @@ ActiveRecord::Schema[8.1].define(version: 2026_06_27_181000) do
     t.datetime "updated_at", null: false
     t.index ["passport_id", "status"], name: "index_permission_requests_on_passport_id_and_status"
     t.index ["passport_id"], name: "index_permission_requests_on_passport_id"
+    t.index ["run_id", "status", "created_at", "id"], name: "index_permission_requests_on_run_status_created_id", order: { created_at: :desc, id: :desc }
+    t.index ["run_id", "status", "decided_at", "id"], name: "index_permission_requests_on_run_status_decided_id", order: { decided_at: :desc, id: :desc }
     t.index ["run_id", "status"], name: "index_permission_requests_on_run_id_and_status"
     t.index ["run_id"], name: "index_permission_requests_on_run_id"
     t.index ["tool_action_id"], name: "index_permission_requests_on_tool_action_id", unique: true
   end
 
   create_table "runs", force: :cascade do |t|
+    t.integer "audit_events_count", default: 0, null: false
     t.string "bridge_token", null: false
     t.datetime "created_at", null: false
     t.text "error_message"
     t.datetime "finished_at"
+    t.datetime "last_activity_at", null: false
     t.datetime "last_seen_at"
     t.string "mode", null: false
     t.integer "observed_pid"
+    t.integer "passports_count", default: 0, null: false
+    t.integer "pending_permission_requests_count", default: 0, null: false
     t.string "project_path", null: false
     t.string "runtime_name", null: false
     t.string "runtime_session_id"
     t.datetime "started_at"
     t.string "status", null: false
     t.string "title"
+    t.integer "tool_actions_count", default: 0, null: false
     t.datetime "updated_at", null: false
     t.index ["bridge_token"], name: "index_runs_on_bridge_token", unique: true
-    t.index ["last_seen_at", "created_at"], name: "index_runs_on_last_seen_at_and_created_at"
+    t.index ["last_activity_at", "created_at", "id"], name: "index_runs_on_last_activity_at_created_at_id", order: :desc
     t.index ["runtime_name", "created_at"], name: "index_runs_on_runtime_name_and_created_at"
     t.index ["runtime_name", "runtime_session_id"], name: "index_runs_on_runtime_name_and_runtime_session_id", unique: true, where: "runtime_session_id IS NOT NULL"
     t.index ["status"], name: "index_runs_on_status"

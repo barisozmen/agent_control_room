@@ -1,7 +1,8 @@
 <% audit_event_page = @run.audit_timeline_page %>
+<% tool_action_page = @run.tool_action_page %>
 
 <%= turbo_stream.replace "run_header", partial: "runs/run_header", locals: { run: @run } %>
 <%= turbo_stream.replace "permission_inbox", partial: "runs/permission_inbox", locals: { run: @run } %>
 <%= turbo_stream.replace "passport_detail", partial: "runs/passport_detail", locals: { run: @run, passport: @passport } %>
 <%= turbo_stream.replace "audit_timeline", partial: "runs/audit_timeline", locals: { run: @run, audit_event_page: audit_event_page } %>
-<%= turbo_stream.replace "tool_action_list", partial: "runs/tool_action_list", locals: { run: @run, tool_actions: @run.tool_actions_for_display } %>
+<%= turbo_stream.replace "tool_action_list", partial: "runs/tool_action_list", locals: { run: @run, tool_action_page: tool_action_page } %>

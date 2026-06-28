@@ -1,4 +1,5 @@
 <%= turbo_frame_tag "run_header" do %>
+  <% header_counts = run.header_counts %>
   <header class="ap-panel border-b px-4 py-3 sm:px-6">
     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div class="min-w-0">
@@ -11,9 +12,9 @@
             <span class="ap-status-dot <%= status_dot_classes(run.status) %>" aria-hidden="true"></span>
             <span class="ap-status-text">Status: <%= status_label(run.status) %></span>
           </span>
-          <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.passports.count, "passport") %></span>
-          <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.permission_requests.where(status: "pending").count, "pending ask") %></span>
-          <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.tool_actions.count, "action") %></span>
+          <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(header_counts.passports, "passport") %></span>
+          <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(header_counts.pending_permission_requests, "pending ask") %></span>
+          <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(header_counts.tool_actions, "action") %></span>
         </div>
         <% if run.error_message.present? %>
           <p class="ap-mono mt-2 break-words text-xs ap-result-negative"><%= run.error_message %></p>

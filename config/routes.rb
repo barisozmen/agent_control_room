@@ -12,6 +12,7 @@ Rails.application.routes.draw do
   resources :runs, only: %i[create show] do
     resources :passports, only: :show
     resources :audit_events, only: :index
+    resources :tool_actions, only: :index
   end
 
   resources :permission_requests, only: :show do

@@ -68,7 +68,9 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
       [ "replace", "run_header" ],
       [ "replace", "permission_inbox" ],
       [ "replace", "passport_detail" ],
-      [ "replace", "tool_action_list" ]
+      [ "prepend", "session_action_list" ],
+      [ "update", "tool_action_count" ],
+      [ "remove", "session_action_empty_state" ]
     ]
     body = JSON.parse(response.body)
     assert_equal "ToolAction", body.fetch("type")
@@ -212,7 +214,9 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
       [ "update", "audit_timeline_count" ],
       [ "remove", "audit_timeline_empty_state" ],
       [ "replace", "passport_detail" ],
-      [ "replace", "tool_action_list" ]
+      [ "prepend", "session_action_list" ],
+      [ "update", "tool_action_count" ],
+      [ "remove", "session_action_empty_state" ]
     ]
   end
 
@@ -362,7 +366,9 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
       [ "append", "audit_event_list" ],
       [ "update", "audit_timeline_count" ],
       [ "replace", "passport_detail" ],
-      [ "replace", "tool_action_list" ]
+      [ "prepend", "session_action_list" ],
+      [ "update", "tool_action_count" ],
+      [ "remove", "session_action_empty_state" ]
     ]
     assert_equal "finished", action.reload.status
     assert_equal 0, action.exit_status
@@ -480,6 +486,7 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal expected.sort, actual.sort
     refute_includes actual.map(&:last), "audit_timeline"
+    refute_includes actual.map(&:last), "tool_action_list", "tool action events should stream one action row instead of replacing the ledger" unless expected.any? { |(_, target)| target == "tool_action_list" }
     refute_includes actual.map(&:last), "permission_inbox", "permission inbox should only stream when pending asks change" unless expected.any? { |(_, target)| target == "permission_inbox" }
     refute_includes actual.map(&:last), "session_sidebar", "session sidebar should only stream when status or pending counts change" unless expected.any? { |(_, target)| target == "session_sidebar" }
   end

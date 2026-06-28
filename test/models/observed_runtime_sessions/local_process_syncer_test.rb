@@ -89,6 +89,7 @@ class ObservedRuntimeSessions::LocalProcessSyncerTest < ActiveSupport::TestCase
     assert_equal "OpenCode: agent_control_room", run.title
     assert_equal started_at.to_i, run.started_at.to_i
     assert_equal last_seen_at.to_i, run.last_seen_at.to_i
+    assert_equal last_seen_at.to_i, run.last_activity_at.to_i
     assert_equal "opencode/main-agent", run.passports.find_by!(actor_ref: "main-agent").actor_name
   end
 

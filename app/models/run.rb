@@ -1,4 +1,16 @@
 class Run < ApplicationRecord
+  HeaderCounts = Data.define(:passports, :pending_permission_requests, :tool_actions)
+
+  ToolActionPage = Data.define(:actions, :total_count, :older_count, :oldest_action_id, :before_id) do
+    def more_actions?
+      older_count.positive?
+    end
+
+    def paginated?
+      before_id.present?
+    end
+  end
+
   PassportTree = Data.define(:root_passport, :children_by_parent_id, :child_counts_by_passport_id, :agent_count, :passport_by_id, :passport_by_actor_ref) do
     def children_for(passport)
       return [] if passport.blank?
@@ -25,6 +37,7 @@ class Run < ApplicationRecord
   STATUSES = %w[starting running completed interrupted failed].freeze
   MODES = %w[demo manual observed].freeze
   SESSION_LIST_LIMIT = 50
+  TOOL_ACTION_PAGE_SIZE = 100
 
   has_many :passports, dependent: :destroy
   has_many :tool_actions, dependent: :destroy
@@ -38,9 +51,10 @@ class Run < ApplicationRecord
   validates :mode, inclusion: { in: MODES }
 
   before_validation :ensure_bridge_token, on: :create
+  before_validation :derive_last_activity_at
 
   scope :latest_first, -> { order(created_at: :desc, id: :desc) }
-  scope :session_list, -> { order(Arel.sql("COALESCE(last_seen_at, started_at, created_at) DESC"), created_at: :desc, id: :desc).limit(SESSION_LIST_LIMIT) }
+  scope :session_list, -> { order(last_activity_at: :desc, created_at: :desc, id: :desc).limit(SESSION_LIST_LIMIT) }
   scope :active, -> { where(status: %w[starting running]) }
 
   def self.current
@@ -80,8 +94,42 @@ class Run < ApplicationRecord
     passports.find_by(id: passport_id) || passports.find_by(actor_ref: "security-auditor") || passports.find_by(actor_ref: "main-agent") || root_passport
   end
 
-  def tool_actions_for_display
-    tool_actions.includes({ passport: :grants }, { permission_request: :grant }).order(requested_at: :desc, id: :desc)
+  def tool_actions_for_display(limit: TOOL_ACTION_PAGE_SIZE, before_id: nil)
+    tool_action_page(limit: limit, before_id: before_id).actions
+  end
+
+  def tool_action_page(before_id: nil, limit: TOOL_ACTION_PAGE_SIZE)
+    total_count = tool_actions_count.to_i
+    cursor = tool_actions.find_by(id: before_id) if before_id.present?
+    relation = tool_actions_for_display_relation
+    relation = relation.where(tool_action_display_cursor_condition(cursor)) if cursor.present?
+    actions = relation.limit(limit).to_a
+    oldest_action = actions.last
+
+    older_count =
+      if oldest_action.blank?
+        0
+      elsif cursor.present?
+        tool_actions.where(tool_action_display_cursor_condition(oldest_action)).unscope(:order).count
+      else
+        total_count - actions.size
+      end
+
+    ToolActionPage.new(
+      actions: actions,
+      total_count: total_count,
+      older_count: older_count,
+      oldest_action_id: oldest_action&.id,
+      before_id: cursor&.id
+    )
+  end
+
+  def header_counts
+    HeaderCounts.new(
+      passports: passports_count,
+      pending_permission_requests: pending_permission_requests_count,
+      tool_actions: tool_actions_count
+    )
   end
 
   def passport_tree
@@ -135,7 +183,7 @@ class Run < ApplicationRecord
     broadcast_replace_to self, target: "passport_tree", partial: "runs/passport_tree", locals: { run: self, selected_passport: selected_passport, passport_tree: passport_tree }
     broadcast_replace_to self, target: "permission_inbox", partial: "runs/permission_inbox", locals: { run: self }
     broadcast_replace_to self, target: "audit_timeline", partial: "runs/audit_timeline", locals: { run: self, audit_event_page: audit_timeline_page }
-    broadcast_replace_to self, target: "tool_action_list", partial: "runs/tool_action_list", locals: { run: self, tool_actions: tool_actions_for_display }
+    broadcast_replace_to self, target: "tool_action_list", partial: "runs/tool_action_list", locals: { run: self, tool_action_page: tool_action_page }
     broadcast_replace_to "runtime_sessions", target: "session_sidebar", partial: "runs/session_sidebar", locals: session_sidebar.merge(selected_run: nil)
 
     return unless selected_passport.present?
@@ -158,7 +206,7 @@ class Run < ApplicationRecord
     broadcast_replace_to self, target: "run_header", partial: "runs/run_header", locals: { run: self } if normalized_changes.include?(:run_header)
     broadcast_replace_to self, target: "passport_tree", partial: "runs/passport_tree", locals: { run: self, selected_passport: selected_passport, passport_tree: passport_tree } if normalized_changes.include?(:passport_tree)
     broadcast_replace_to self, target: "permission_inbox", partial: "runs/permission_inbox", locals: { run: self } if normalized_changes.include?(:permission_inbox)
-    broadcast_replace_to self, target: "tool_action_list", partial: "runs/tool_action_list", locals: { run: self, tool_actions: tool_actions_for_display } if normalized_changes.include?(:tool_action_list)
+    broadcast_tool_action_change!(audit_event) if normalized_changes.include?(:tool_action_list)
 
     return unless normalized_changes.include?(:passport_detail) && selected_passport.present?
 
@@ -171,12 +219,38 @@ class Run < ApplicationRecord
 
   private
 
+  def tool_actions_for_display_relation
+    tool_actions.includes({ passport: :grants }, { permission_request: :grant }).order(requested_at: :desc, id: :desc)
+  end
+
+  def tool_action_display_cursor_condition(action)
+    table = ToolAction.arel_table
+
+    table[:requested_at].lt(action.requested_at).or(
+      table[:requested_at].eq(action.requested_at).and(table[:id].lt(action.id))
+    )
+  end
+
   def ensure_bridge_token
     self.bridge_token ||= SecureRandom.urlsafe_base64(32)
   end
 
+  def derive_last_activity_at
+    return unless has_attribute?(:last_activity_at)
+
+    self.last_activity_at =
+      timestamp_attribute(:last_seen_at) ||
+      timestamp_attribute(:started_at) ||
+      timestamp_attribute(:created_at) ||
+      Time.current
+  end
+
+  def timestamp_attribute(name)
+    self[name] if has_attribute?(name)
+  end
+
   def broadcast_audit_event!(audit_event)
-    audit_events_count = audit_events.count
+    audit_events_count = self.audit_events_count
 
     broadcast_append_to self, target: "audit_event_list", partial: "runs/audit_event", locals: { run: self, event: audit_event }
     broadcast_update_to self, target: "audit_timeline_count", partial: "runs/audit_timeline_count", locals: { audit_events_count: audit_events_count }
@@ -188,5 +262,42 @@ class Run < ApplicationRecord
 
     broadcast_replace_to self, target: "session_sidebar", partial: "runs/session_sidebar", locals: session_sidebar
     broadcast_replace_to "runtime_sessions", target: "session_sidebar", partial: "runs/session_sidebar", locals: session_sidebar.merge(selected_run: nil)
+  end
+
+  def broadcast_tool_action_change!(audit_event)
+    tool_action = tool_action_for_broadcast(audit_event)
+
+    if tool_action.blank?
+      broadcast_replace_to self, target: "tool_action_list", partial: "runs/tool_action_list", locals: { run: self, tool_action_page: tool_action_page }
+    elsif tool_action == latest_tool_action_for_broadcast
+      total_count = tool_actions_count.to_i
+
+      if total_count <= TOOL_ACTION_PAGE_SIZE
+        broadcast_tool_action!(tool_action, total_count: total_count)
+      else
+        broadcast_replace_to self, target: "tool_action_list", partial: "runs/tool_action_list", locals: { run: self, tool_action_page: tool_action_page }
+      end
+    else
+      broadcast_replace_to self, target: ActionView::RecordIdentifier.dom_id(tool_action), partial: "runs/tool_action", locals: { run: self, action: tool_action }
+    end
+  end
+
+  def latest_tool_action_for_broadcast
+    tool_actions_for_display_relation.limit(1).first
+  end
+
+  def tool_action_for_broadcast(audit_event)
+    tool_action_id = audit_event&.tool_action_id
+    return if tool_action_id.blank?
+
+    tool_actions.includes({ passport: :grants }, { permission_request: :grant }).find_by(id: tool_action_id)
+  end
+
+  def broadcast_tool_action!(tool_action, total_count:)
+    visible_count = [ total_count, TOOL_ACTION_PAGE_SIZE ].min
+
+    broadcast_prepend_to self, target: "session_action_list", partial: "runs/tool_action", locals: { run: self, action: tool_action }
+    broadcast_update_to self, target: "tool_action_count", partial: "runs/tool_action_count", locals: { visible_count: visible_count, total_count: total_count }
+    broadcast_remove_to self, target: "session_action_empty_state" if total_count == 1
   end
 end

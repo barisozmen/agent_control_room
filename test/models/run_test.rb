@@ -39,6 +39,89 @@ class RunTest < ActiveSupport::TestCase
     assert_operator run.bridge_token.length, :>=, 32
   end
 
+  test "last activity tracks last seen before started and created timestamps" do
+    created_at = Time.zone.parse("2026-06-27 10:00:00 UTC")
+    started_at = created_at + 5.minutes
+    last_seen_at = created_at + 10.minutes
+    run = Run.create!(
+      runtime_name: "opencode",
+      project_path: Rails.root.to_s,
+      mode: "observed",
+      status: "running",
+      created_at: created_at,
+      started_at: started_at,
+      last_seen_at: last_seen_at
+    )
+
+    assert_equal last_seen_at.to_i, run.reload.last_activity_at.to_i
+
+    run.update!(last_seen_at: nil)
+    assert_equal started_at.to_i, run.reload.last_activity_at.to_i
+
+    run.update!(started_at: nil)
+    assert_equal created_at.to_i, run.reload.last_activity_at.to_i
+  end
+
+  test "header counts track passports pending permission requests and tool actions" do
+    run = create_run
+    passport = create_passport(
+      run: run,
+      actor_ref: "owner",
+      actor_name: "Owner",
+      actor_kind: "human",
+      provider: "local"
+    )
+    tool_action = run.tool_actions.create!(
+      passport: passport,
+      capability: "bash",
+      action_kind: "command",
+      status: "asking",
+      requested_at: Time.current,
+      command: "bin/rails test"
+    )
+    permission_request = run.permission_requests.create!(
+      passport: passport,
+      tool_action: tool_action,
+      status: "pending"
+    )
+
+    assert_header_counts run, passports: 1, pending_permission_requests: 1, tool_actions: 1
+    assert_header_counts run.reload, passports: 1, pending_permission_requests: 1, tool_actions: 1
+
+    permission_request.resolve!("deny")
+
+    assert_header_counts run, passports: 1, pending_permission_requests: 0, tool_actions: 1
+    assert_header_counts run.reload, passports: 1, pending_permission_requests: 0, tool_actions: 1
+
+    tool_action.destroy!
+    passport.destroy!
+
+    assert_header_counts run, passports: 0, pending_permission_requests: 0, tool_actions: 0
+    assert_header_counts run.reload, passports: 0, pending_permission_requests: 0, tool_actions: 0
+  end
+
+  test "run header partial renders persisted counts without table count queries" do
+    run = create_run
+    create_passport(
+      run: run,
+      actor_ref: "owner",
+      actor_name: "Owner",
+      actor_kind: "human",
+      provider: "local"
+    )
+    create_permission_request_for(run)
+
+    html = nil
+    queries = capture_sql do
+      html = ApplicationController.renderer.render(partial: "runs/run_header", locals: { run: run })
+    end
+
+    assert_includes html, "1 passport"
+    assert_includes html, "1 pending ask"
+    assert_includes html, "1 action"
+    assert_empty header_count_queries(queries), queries.join("\n")
+  end
+
   test "passport tree snapshot prevents recursive passport queries while rendering" do
     run = create_run
     owner = create_passport(run: run, actor_ref: "baris", actor_name: "Baris", actor_kind: "human", provider: "local")
@@ -87,6 +170,117 @@ class RunTest < ActiveSupport::TestCase
     assert_equal Run::SESSION_LIST_LIMIT, listed_runs.size
     assert_includes listed_runs, runs.first
     assert_not_includes listed_runs, runs.last
+  end
+
+  test "session list orders by denormalized last activity" do
+    base = Time.zone.parse("2026-06-27 12:00:00 UTC")
+    stale_recently_created = Run.create!(
+      runtime_name: "opencode",
+      project_path: Rails.root.to_s,
+      mode: "observed",
+      status: "running",
+      started_at: base - 30.minutes,
+      created_at: base + 10.minutes
+    )
+    created_fallback = Run.create!(
+      runtime_name: "opencode",
+      project_path: Rails.root.to_s,
+      mode: "manual",
+      status: "starting",
+      created_at: base
+    )
+    started = Run.create!(
+      runtime_name: "opencode",
+      project_path: Rails.root.to_s,
+      mode: "demo",
+      status: "running",
+      started_at: base + 1.minute,
+      created_at: base - 10.minutes
+    )
+    seen = Run.create!(
+      runtime_name: "opencode",
+      project_path: Rails.root.to_s,
+      mode: "observed",
+      status: "running",
+      started_at: base - 1.hour,
+      last_seen_at: base + 2.minutes,
+      created_at: base - 1.hour
+    )
+    relation = Run.session_list.where(id: [ stale_recently_created, created_fallback, started, seen ])
+
+    assert_no_match(/COALESCE/i, relation.to_sql)
+    assert_match(/last_activity_at/i, relation.to_sql)
+    assert_equal [ seen, started, created_fallback, stale_recently_created ], relation.to_a
+  end
+
+  test "session list query plan uses the last activity index" do
+    plan_rows = ActiveRecord::Base.connection.execute("EXPLAIN QUERY PLAN #{Run.session_list.to_sql}")
+    plan = plan_rows.map { |row| row.respond_to?(:values) ? row.values.join(" ") : row.join(" ") }.join("\n")
+
+    assert_match(/index_runs_on_last_activity_at_created_at_id/i, plan)
+    assert_no_match(/USE TEMP B-TREE/i, plan)
+  end
+
+  test "tool actions for display are capped to the recent action page" do
+    run = create_run
+    owner = create_passport(run: run, actor_ref: "owner", actor_name: "Owner", actor_kind: "human", provider: "local")
+    passport = create_passport(run: run, actor_ref: "main-agent", actor_name: "opencode/main-agent", parent: owner)
+    base_time = Time.current
+
+    actions = 105.times.map do |index|
+      run.tool_actions.create!(
+        passport: passport,
+        capability: "bash",
+        action_kind: "command",
+        action_summary: "action #{index}",
+        status: "finished",
+        requested_at: base_time + index.seconds
+      )
+    end
+
+    displayed_actions = run.tool_actions_for_display
+
+    assert_equal Run::TOOL_ACTION_PAGE_SIZE, displayed_actions.size
+    assert_equal actions[104], displayed_actions.first
+    assert_equal actions[5], displayed_actions.last
+    assert_not_includes displayed_actions, actions[4]
+  end
+
+  test "tool action page tracks total and older action counts" do
+    run = create_run
+    owner = create_passport(run: run, actor_ref: "owner", actor_name: "Owner", actor_kind: "human", provider: "local")
+    passport = create_passport(run: run, actor_ref: "main-agent", actor_name: "opencode/main-agent", parent: owner)
+    base_time = Time.current
+
+    actions = 105.times.map do |index|
+      run.tool_actions.create!(
+        passport: passport,
+        capability: "bash",
+        action_kind: "command",
+        action_summary: "action #{index}",
+        status: "finished",
+        requested_at: base_time + index.seconds
+      )
+    end
+
+    page = run.tool_action_page
+
+    assert_equal Run::TOOL_ACTION_PAGE_SIZE, page.actions.size
+    assert_equal 105, page.total_count
+    assert_equal 5, page.older_count
+    assert_equal actions[104], page.actions.first
+    assert_equal actions[5], page.actions.last
+    assert_equal actions[5].id, page.oldest_action_id
+    assert page.more_actions?
+
+    older_page = run.tool_action_page(before_id: page.oldest_action_id)
+
+    assert_equal actions.first(5).reverse, older_page.actions
+    assert_equal 105, older_page.total_count
+    assert_equal 0, older_page.older_count
+    assert_equal page.oldest_action_id, older_page.before_id
+    assert_not older_page.more_actions?
+    assert older_page.paginated?
   end
 
   test "pending permission counts are fetched in one grouped query" do
@@ -144,6 +338,20 @@ class RunTest < ActiveSupport::TestCase
 
   def passport_queries(queries)
     queries.grep(/FROM "?passports"?/i)
+  end
+
+  def assert_header_counts(run, passports:, pending_permission_requests:, tool_actions:)
+    counts = run.header_counts
+
+    assert_equal passports, counts.passports
+    assert_equal pending_permission_requests, counts.pending_permission_requests
+    assert_equal tool_actions, counts.tool_actions
+  end
+
+  def header_count_queries(queries)
+    queries.select do |sql|
+      sql.match?(/COUNT\(/i) && sql.match?(/FROM "?(?:passports|permission_requests|tool_actions)"?/i)
+    end
   end
 
   def create_permission_request_for(run, status: "pending")

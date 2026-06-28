@@ -5,7 +5,7 @@ class Passport < ApplicationRecord
   CAPABILITIES = %w[read edit bash web delegate].freeze
   RULE_RANK = { "deny" => 0, "ask" => 1, "allow" => 2 }.freeze
 
-  belongs_to :run
+  belongs_to :run, counter_cache: true
   belongs_to :parent, class_name: "Passport", optional: true
 
   has_many :children, -> { order(:created_at, :id) }, class_name: "Passport", foreign_key: :parent_id, inverse_of: :parent, dependent: :destroy
@@ -42,15 +42,28 @@ class Passport < ApplicationRecord
     lineage.map(&:actor_name).join(" / ")
   end
 
-  def capability_rows
+  def capability_rows(local_grants = ordered_grants)
+    grants_by_capability = local_grants.group_by(&:capability)
+
     CAPABILITIES.map do |capability|
       {
         capability: capability,
         rule: rule_for(capability),
         parent_rule: parent&.rule_for(capability),
-        grants: grants.where(capability: capability).order(:pattern)
+        grants: grants_by_capability.fetch(capability, [])
       }
     end
+  end
+
+  def ordered_grants
+    grant_records =
+      if association(:grants).loaded?
+        grants.to_a
+      else
+        grants.order(:capability, :pattern, :id).to_a
+      end
+
+    grant_records.sort_by { |grant| [ grant.capability.to_s, grant.pattern.to_s, grant.id.to_i ] }
   end
 
   def local_grant_for?(capability, action_text)

@@ -78,7 +78,7 @@
         <% if @panel == "audit" %>
           <%= render "runs/audit_timeline", run: @run, audit_event_page: @run.audit_timeline_page %>
         <% elsif @panel == "tools" %>
-          <%= render "runs/tool_action_list", run: @run, tool_actions: @tool_actions || @run.tool_actions_for_display %>
+          <%= render "runs/tool_action_list", run: @run, tool_action_page: @tool_action_page || @run.tool_action_page %>
         <% else %>
           <%= render "runs/passport_detail", run: @run, passport: @selected_passport %>
         <% end %>

@@ -28,6 +28,23 @@ class AuditEventTest < ActiveSupport::TestCase
     assert page.more_events?
   end
 
+  test "timeline page total count uses the run counter cache" do
+    run = create_run
+    base_time = Time.current
+
+    105.times do |index|
+      run.audit_events.create!(event_kind: "event-#{index}", result: "ok", occurred_at: base_time + index.seconds)
+    end
+
+    page = nil
+    queries = capture_sql do
+      page = run.audit_timeline_page
+    end
+
+    assert_equal 105, page.total_count
+    assert_empty audit_event_count_queries(queries), queries.join("\n")
+  end
+
   test "timeline page can load older receipts before the current tail" do
     run = create_run
     base_time = Time.current
@@ -63,6 +80,43 @@ class AuditEventTest < ActiveSupport::TestCase
     assert_difference -> { run.audit_events.count }, 2 do
       run.audit_events.create!(event_kind: "first", result: "ok", occurred_at: Time.current)
       run.audit_events.create!(event_kind: "second", result: "ok", occurred_at: Time.current)
+    end
+  end
+
+  test "audit event counter cache tracks creates and destroys" do
+    run = create_run
+    event = run.audit_events.create!(event_kind: "first", result: "ok", occurred_at: Time.current)
+
+    assert_equal 1, run.audit_events_count
+    assert_equal 1, run.reload.audit_events_count
+
+    event.destroy!
+
+    assert_equal 0, run.audit_events_count
+    assert_equal 0, run.reload.audit_events_count
+  end
+
+  private
+
+  def capture_sql(&block)
+    queries = []
+    subscriber = lambda do |_name, _started, _finished, _unique_id, payload|
+      sql = payload[:sql].to_s
+      next if payload[:cached]
+      next if payload[:name] == "SCHEMA"
+      next if sql.match?(/\A(?:BEGIN|COMMIT|ROLLBACK|SAVEPOINT|RELEASE)/i)
+      next if sql.match?(/(?:sqlite_master|ar_internal_metadata)/i)
+
+      queries << sql
+    end
+
+    ActiveSupport::Notifications.subscribed(subscriber, "sql.active_record", &block)
+    queries
+  end
+
+  def audit_event_count_queries(queries)
+    queries.select do |sql|
+      sql.match?(/COUNT\(/i) && sql.match?(/FROM "?audit_events"?/i)
     end
   end
 end

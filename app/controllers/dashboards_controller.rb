@@ -1,5 +1,5 @@
 class DashboardsController < ApplicationController
-  before_action :sync_local_runtime_sessions, only: :show
+  after_action :enqueue_local_runtime_session_sync, only: :show
 
   def show
     @run = Run.current
@@ -7,7 +7,7 @@ class DashboardsController < ApplicationController
     @runs = @session_sidebar.fetch(:runs)
     @passport_tree = @run&.passport_tree
     @selected_passport = @passport_tree&.selected_passport(params[:passport_id])
-    @tool_actions = @run&.tool_actions_for_display || []
+    @tool_action_page = @run&.tool_action_page
     @panel = %w[passport tools audit].include?(params[:panel]) ? params[:panel] : nil
 
     render "runs/show" if @run.present?
@@ -15,9 +15,7 @@ class DashboardsController < ApplicationController
 
   private
 
-  def sync_local_runtime_sessions
-    return if Rails.env.test?
-
-    ObservedRuntimeSessions::LocalProcessSyncer.sync_if_stale!
+  def enqueue_local_runtime_session_sync
+    ObservedRuntimeSessions::LocalProcessSyncJob.perform_later
   end
 end

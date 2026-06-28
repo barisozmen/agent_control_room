@@ -19,10 +19,16 @@ class PermissionRequest < ApplicationRecord
   scope :pending, -> { where(status: "pending").order(created_at: :desc, id: :desc) }
   scope :resolved, -> { where(status: "resolved").order(decided_at: :desc, id: :desc) }
 
+  after_create :increment_pending_permission_requests_counter, if: :pending?
+  after_update :adjust_pending_permission_requests_counter
+  after_destroy :decrement_pending_permission_requests_counter, if: :pending?
+
   def resolve!(scope)
     normalized_scope = scope.to_s
     decision_value = normalized_scope == "passport" ? "passport_grant" : normalized_scope
     raise ArgumentError, "Unknown decision scope" unless DECISIONS.include?(decision_value)
+
+    @pending_permission_requests_counter_run = run if association(:run).loaded?
 
     transaction do
       lock!
@@ -41,10 +47,16 @@ class PermissionRequest < ApplicationRecord
 
       append_decision_receipt!
     end
+  ensure
+    @pending_permission_requests_counter_run = nil
   end
 
   def resolved?
     status == "resolved"
+  end
+
+  def pending?
+    status == "pending"
   end
 
   def suggested_grant_capability
@@ -102,5 +114,37 @@ class PermissionRequest < ApplicationRecord
       result: decision == "deny" ? "denied" : "allowed",
       occurred_at: Time.current
     )
+  end
+
+  def adjust_pending_permission_requests_counter
+    return unless saved_change_to_run_id? || saved_change_to_status?
+
+    previous_run_id, current_run_id = saved_change_to_run_id? ? saved_change_to_run_id : [ run_id, run_id ]
+    previous_status, current_status = saved_change_to_status? ? saved_change_to_status : [ status, status ]
+
+    decrement_pending_permission_requests_counter(previous_run_id) if previous_status == "pending"
+    increment_pending_permission_requests_counter(current_run_id) if current_status == "pending"
+  end
+
+  def increment_pending_permission_requests_counter(counter_run_id = run_id)
+    return if counter_run_id.blank?
+
+    Run.increment_counter(:pending_permission_requests_count, counter_run_id)
+    update_loaded_run_pending_permission_requests_count(counter_run_id, 1)
+  end
+
+  def decrement_pending_permission_requests_counter(counter_run_id = run_id)
+    return if counter_run_id.blank?
+
+    Run.decrement_counter(:pending_permission_requests_count, counter_run_id)
+    update_loaded_run_pending_permission_requests_count(counter_run_id, -1)
+  end
+
+  def update_loaded_run_pending_permission_requests_count(counter_run_id, delta)
+    loaded_run = @pending_permission_requests_counter_run
+    loaded_run ||= run if association(:run).loaded?
+    return unless loaded_run&.id == counter_run_id
+
+    loaded_run.pending_permission_requests_count = loaded_run.pending_permission_requests_count.to_i + delta
   end
 end

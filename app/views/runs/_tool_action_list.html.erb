@@ -1,5 +1,12 @@
 <%= turbo_frame_tag "tool_action_list" do %>
-  <% actions = local_assigns.fetch(:tool_actions) { run.tool_actions_for_display } %>
+  <% tool_action_page = local_assigns.fetch(:tool_action_page) { run.tool_action_page } %>
+  <% actions = tool_action_page.actions %>
+  <% visible_count = actions.size %>
+  <% total_count = tool_action_page.total_count %>
+  <% latest_page = !tool_action_page.paginated? %>
+  <% action_list_dom_id = latest_page ? "session_action_list" : "session_action_page_list" %>
+  <% action_count_dom_id = latest_page ? "tool_action_count" : "tool_action_page_count" %>
+  <% empty_state_dom_id = latest_page ? "session_action_empty_state" : "session_action_page_empty_state" %>
 
   <div class="flex min-h-[calc(100dvh-53px)] flex-col">
     <div class="ap-pane-header">
@@ -8,60 +15,32 @@
           <p class="ap-kicker"><%= run.runtime_label.downcase %> session</p>
           <h2 id="tools-drawer-title" class="ap-pane-title mt-1">Action ledger</h2>
         </div>
-        <p class="ap-mono text-xs ap-muted"><%= pluralize(actions.size, "action") %></p>
+        <p id="<%= action_count_dom_id %>" class="ap-mono text-xs ap-muted">
+          <%= render "runs/tool_action_count", visible_count: visible_count, total_count: total_count %>
+        </p>
       </div>
     </div>
 
     <div class="ap-scroll flex-1 overflow-auto">
-      <% if actions.any? %>
-        <ol id="session_action_list" data-testid="session-action-list" class="divide-y divide-[rgba(8,0,0,0.10)]">
-          <% actions.each do |action| %>
-            <% passport = action.passport %>
-            <% permission_state = tool_action_permission_state(action) %>
-            <% payload_text = action.request_text if action.request_text.present? && action.request_text != action.action_summary %>
+      <ol id="<%= action_list_dom_id %>" data-testid="session-action-list" class="divide-y divide-[rgba(8,0,0,0.10)]">
+        <%= render partial: "runs/tool_action", collection: actions, as: :action, locals: { run: run } %>
+      </ol>
 
-            <li id="<%= dom_id(action) %>"
-                data-testid="session-action"
-                data-action-status="<%= action.status %>"
-                data-action-capability="<%= action.capability %>"
-                class="grid grid-cols-1 gap-3 px-4 py-3 transition-colors hover:bg-[var(--ap-bg-weak)] lg:grid-cols-[92px_1fr] lg:items-start">
-              <div class="ap-mono text-xs ap-muted">
-                <%= action.requested_at.strftime("%H:%M:%S") %>
-              </div>
-
-              <div class="min-w-0">
-                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                  <span class="ap-event-chip"><%= action.capability %></span>
-                  <span class="ap-mono text-xs ap-muted"><%= action.action_kind %></span>
-                  <%= link_to passport.actor_name,
-                        run_path(run, passport_id: passport.id, panel: "passport"),
-                        class: "ap-inline-link ap-mono text-xs",
-                        data: { turbo_frame: "_top", testid: "session-action-actor" } %>
-                  <span data-testid="session-action-status" class="ap-mono ml-auto text-xs font-medium <%= result_text_classes(action.status) %>"><%= action.status %></span>
-                </div>
-
-                <p data-testid="session-action-summary" class="mt-2 text-sm font-medium leading-5 ap-text-strong"><%= action.action_summary %></p>
-
-                <% if payload_text.present? %>
-                  <p data-testid="session-action-payload" class="ap-mono mt-1 break-words text-xs ap-body-muted"><%= payload_text %></p>
-                <% end %>
-
-                <p class="ap-mono mt-2 truncate text-xs ap-muted"><%= passport.lineage_label %></p>
-                <p data-testid="session-action-permission" class="ap-mono mt-1 break-words text-xs ap-muted">
-                  permission:
-                  <span class="font-medium <%= result_text_classes(permission_state[:result]) %>"><%= permission_state[:label] %></span>
-                  <span class="ap-muted"><%= permission_state[:detail] %></span>
-                  <% if action.exit_status.present? %>
-                    <span class="ap-muted">exit <%= action.exit_status %></span>
-                  <% end %>
-                </p>
-              </div>
-            </li>
-          <% end %>
-        </ol>
-      <% else %>
-        <div class="p-4">
+      <% unless actions.any? %>
+        <div id="<%= empty_state_dom_id %>" class="p-4">
           <p class="ap-empty">no actions captured</p>
+        </div>
+      <% end %>
+
+      <% if tool_action_page.more_actions? || tool_action_page.paginated? %>
+        <div class="ap-pane-header flex items-center justify-between gap-3">
+          <% if tool_action_page.more_actions? %>
+            <%= link_to "Load older actions", run_tool_actions_path(run, before_id: tool_action_page.oldest_action_id), class: "ap-quiet-link", data: { turbo_frame: "tool_action_list" } %>
+          <% end %>
+
+          <% if tool_action_page.paginated? %>
+            <%= link_to "Latest actions", run_tool_actions_path(run), class: "ap-quiet-link", data: { turbo_frame: "tool_action_list" } %>
+          <% end %>
         </div>
       <% end %>
     </div>

@@ -1,7 +1,7 @@
 # Agent Identity Control Room
 
 <p align="center">
-  <img src="public/agent-control-room-logo.png" alt="Agent Identity Control Room logo" width="400">
+  <img src="public/agent-control-room-logo.png" alt="Agent Identity Control Room logo" width="120">
 </p>
 
 Observe agent sessions on your computer, inspect agent and subagent lineage, pause risky tool actions, approve or deny requests, grant scoped permissions, and review tamper-evident audit receipts.
@@ -179,4 +179,8 @@ See `CONTRIBUTING.md` for setup, testing, architecture rules, and contribution g
 
 ## How Started
 
-[![Agent Identity Build Day](.github/agent_identity_build_day.jpg)](https://app.agihouse.org/events/agent-identity-build-day)
+<a href="https://app.agihouse.org/events/agent-identity-build-day" target="_blank" rel="noopener noreferrer">
+  <img src=".github/agent_identity_build_day.jpg" alt="Agent Identity Build Day">
+</a>
+
+Started as a project for the AGI House Agent Identity Build Day.
