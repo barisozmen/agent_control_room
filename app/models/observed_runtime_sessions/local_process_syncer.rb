@@ -51,13 +51,20 @@ module ObservedRuntimeSessions
     def default_scanners
       [
         RuntimeAdapters::CodexProcessScanner.new,
-        RuntimeAdapters::CodexSessionLogScanner.new
+        RuntimeAdapters::CodexSessionLogScanner.new,
+        RuntimeAdapters::OpencodeSessionLogScanner.new
       ]
     end
 
     def ingest(session)
       event = session.respond_to?(:to_runtime_event) ? session.to_runtime_event : session
-      ObservedRuntimeSessions::Ingestor.new(runtime_name: "codex", event: event).process
+      ObservedRuntimeSessions::Ingestor.new(runtime_name: runtime_name_for(session, event), event: event).process
+    end
+
+    def runtime_name_for(session, event)
+      return session.runtime_name if session.respond_to?(:runtime_name)
+
+      event.with_indifferent_access[:runtime_name].presence || "codex"
     end
 
     def self.reserve_scan(now:, ttl:)

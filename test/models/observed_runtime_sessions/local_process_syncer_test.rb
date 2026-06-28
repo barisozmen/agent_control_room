@@ -2,6 +2,11 @@ require "test_helper"
 
 class ObservedRuntimeSessions::LocalProcessSyncerTest < ActiveSupport::TestCase
   FakeScanner = Struct.new(:sessions)
+  FakeRuntimeSession = Struct.new(:runtime_name, :event) do
+    def to_runtime_event
+      event
+    end
+  end
 
   class CountingScanner
     attr_reader :calls
@@ -62,6 +67,37 @@ class ObservedRuntimeSessions::LocalProcessSyncerTest < ActiveSupport::TestCase
     end
   end
 
+  test "imports scanner sessions for their declared runtime" do
+    started_at = Time.zone.parse("2026-06-27 19:03:41 UTC")
+    last_seen_at = started_at + 5.minutes
+    event = runtime_event(
+      pid: nil,
+      session_id: "opencode-log-session",
+      title: "OpenCode: agent_control_room",
+      started_at: started_at,
+      occurred_at: started_at,
+      last_seen_at: last_seen_at
+    )
+    session = FakeRuntimeSession.new("opencode", event)
+
+    assert_difference -> { Run.where(runtime_name: "opencode").count }, 1 do
+      ObservedRuntimeSessions::LocalProcessSyncer.sync!(scanners: [ FakeScanner.new([ session ]) ])
+    end
+
+    run = Run.find_by!(runtime_name: "opencode", runtime_session_id: "opencode-log-session")
+
+    assert_equal "OpenCode: agent_control_room", run.title
+    assert_equal started_at.to_i, run.started_at.to_i
+    assert_equal last_seen_at.to_i, run.last_seen_at.to_i
+    assert_equal "opencode/main-agent", run.passports.find_by!(actor_ref: "main-agent").actor_name
+  end
+
+  test "default scanners include opencode session logs" do
+    scanner_classes = ObservedRuntimeSessions::LocalProcessSyncer.new.send(:default_scanners).map(&:class)
+
+    assert_includes scanner_classes, RuntimeAdapters::OpencodeSessionLogScanner
+  end
+
   test "sync_if_stale skips scanner work inside the ttl" do
     now = Time.current
     event = runtime_event(pid: 5151, occurred_at: now)
@@ -110,15 +146,18 @@ class ObservedRuntimeSessions::LocalProcessSyncerTest < ActiveSupport::TestCase
 
   private
 
-  def runtime_event(pid:, occurred_at: Time.current)
+  def runtime_event(pid:, occurred_at: Time.current, session_id: nil, title: "Codex: agent_control_room", started_at: nil, last_seen_at: nil)
+    session_id ||= "codex-process-#{pid}"
     {
       type: "session.started",
-      event_id: "codex-process-#{pid}-started",
-      session_id: "codex-process-#{pid}",
-      title: "Codex: agent_control_room",
+      event_id: "#{session_id}-started",
+      session_id: session_id,
+      title: title,
       project_path: Rails.root.to_s,
       pid: pid,
+      started_at: started_at&.iso8601,
+      last_seen_at: last_seen_at&.iso8601,
       occurred_at: occurred_at.iso8601
-    }
+    }.compact
   end
 end

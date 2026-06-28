@@ -43,10 +43,10 @@ module ObservedRuntimeSessions
         record.project_path = project_path
         record.mode = "observed"
         record.status = "running" if record.new_record? || record.status.in?(%w[starting completed interrupted failed])
-        record.started_at ||= occurred_at
+        record.started_at ||= started_at
         record.title = title
         record.observed_pid = observed_pid if observed_pid.present?
-        record.last_seen_at = occurred_at
+        record.last_seen_at = last_seen_at
         record.save!
 
         mark_ui_changes(:session_sidebar) if new_run || record.saved_change_to_title? || record.saved_change_to_project_path? || record.saved_change_to_status?
@@ -71,7 +71,9 @@ module ObservedRuntimeSessions
         runtime_name: runtime.name,
         session_id: session_id,
         actor_ref: actor_ref,
-        occurred_at: occurred_at.iso8601
+        occurred_at: occurred_at.iso8601,
+        started_at: started_at.iso8601,
+        last_seen_at: last_seen_at.iso8601
       )
     end
 
@@ -143,7 +145,7 @@ module ObservedRuntimeSessions
     end
 
     def touch_run!
-      run.update!(last_seen_at: occurred_at, title: title)
+      run.update!(last_seen_at: last_seen_at, title: title)
       mark_ui_changes(:session_sidebar) if run.saved_change_to_title?
     end
 
@@ -181,7 +183,23 @@ module ObservedRuntimeSessions
     end
 
     def occurred_at
-      @occurred_at ||= event[:occurred_at].present? ? Time.zone.parse(event[:occurred_at].to_s) : Time.current
+      @occurred_at ||= parsed_time(event[:occurred_at]) || Time.current
+    end
+
+    def started_at
+      @started_at ||= parsed_time(event[:started_at]) || occurred_at
+    end
+
+    def last_seen_at
+      @last_seen_at ||= parsed_time(event[:last_seen_at]) || occurred_at
+    end
+
+    def parsed_time(value)
+      return if value.blank?
+
+      Time.zone.parse(value.to_s)
+    rescue ArgumentError, TypeError
+      nil
     end
 
     def mark_ui_changes(*changes)

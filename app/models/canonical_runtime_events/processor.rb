@@ -28,7 +28,7 @@ module CanonicalRuntimeEvents
     attr_reader :run, :event
 
     def record_session_started
-      run.update!(status: "running", started_at: occurred_at)
+      run.update!(status: "running", started_at: started_at)
       mark_ui_changes(:run_header, :session_sidebar) if run.saved_change_to_status?
       audit!("session.started", result: "started", action_summary: "#{run.runtime_label} session started")
       run
@@ -220,6 +220,10 @@ module CanonicalRuntimeEvents
 
     def occurred_at
       @occurred_at ||= event[:occurred_at].present? ? Time.zone.parse(event[:occurred_at].to_s) : Time.current
+    end
+
+    def started_at
+      @started_at ||= event[:started_at].present? ? Time.zone.parse(event[:started_at].to_s) : occurred_at
     end
 
     def mark_ui_changes(*changes)
