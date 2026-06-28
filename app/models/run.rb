@@ -80,6 +80,10 @@ class Run < ApplicationRecord
     passports.find_by(id: passport_id) || passports.find_by(actor_ref: "security-auditor") || passports.find_by(actor_ref: "main-agent") || root_passport
   end
 
+  def tool_actions_for_display
+    tool_actions.includes({ passport: :grants }, { permission_request: :grant }).order(requested_at: :desc, id: :desc)
+  end
+
   def passport_tree
     ordered_passports = passports.order(:created_at, :id).to_a
     children_by_parent_id = ordered_passports.group_by(&:parent_id)
@@ -131,6 +135,7 @@ class Run < ApplicationRecord
     broadcast_replace_to self, target: "passport_tree", partial: "runs/passport_tree", locals: { run: self, selected_passport: selected_passport, passport_tree: passport_tree }
     broadcast_replace_to self, target: "permission_inbox", partial: "runs/permission_inbox", locals: { run: self }
     broadcast_replace_to self, target: "audit_timeline", partial: "runs/audit_timeline", locals: { run: self, audit_event_page: audit_timeline_page }
+    broadcast_replace_to self, target: "tool_action_list", partial: "runs/tool_action_list", locals: { run: self, tool_actions: tool_actions_for_display }
     broadcast_replace_to "runtime_sessions", target: "session_sidebar", partial: "runs/session_sidebar", locals: session_sidebar.merge(selected_run: nil)
 
     return unless selected_passport.present?
@@ -153,6 +158,7 @@ class Run < ApplicationRecord
     broadcast_replace_to self, target: "run_header", partial: "runs/run_header", locals: { run: self } if normalized_changes.include?(:run_header)
     broadcast_replace_to self, target: "passport_tree", partial: "runs/passport_tree", locals: { run: self, selected_passport: selected_passport, passport_tree: passport_tree } if normalized_changes.include?(:passport_tree)
     broadcast_replace_to self, target: "permission_inbox", partial: "runs/permission_inbox", locals: { run: self } if normalized_changes.include?(:permission_inbox)
+    broadcast_replace_to self, target: "tool_action_list", partial: "runs/tool_action_list", locals: { run: self, tool_actions: tool_actions_for_display } if normalized_changes.include?(:tool_action_list)
 
     return unless normalized_changes.include?(:passport_detail) && selected_passport.present?
 

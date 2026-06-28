@@ -1,8 +1,12 @@
 # Agent Identity Control Room
 
+<p align="center">
+  <img src="public/agent-control-room-logo.png" alt="Agent Identity Control Room logo" width="400">
+</p>
+
 Observe agent sessions on your computer, inspect agent and subagent lineage, pause risky tool actions, approve or deny requests, grant scoped permissions, and review tamper-evident audit receipts.
 
-![Agent Control Room showing OpenCode sessions, runtime lineage, passport authority, and receipts](.github/assets/agent-control-room-working.png)
+![Agent Identity Control Room showing OpenCode sessions, runtime lineage, passport authority, and receipts](.github/assets/agent-control-room-working.png)
 
 The v1 prototype is OpenCode-first: a Rails control room plus an OpenCode observer. The core model is runtime-neutral, and the app now has concrete demo launch adapters for OpenCode, Claude Code, and Codex through the same event contract.
 
@@ -29,7 +33,7 @@ bin/find_server_port --url
 
 Then start `opencode` from any project on this computer. The session appears in the left sidebar. Click a session to inspect its lineage, current ask, passport details, and receipts.
 
-The observer is fail-open when the Rails app is offline, so stopping Agent Control Room does not break normal OpenCode usage.
+The observer is fail-open when the Rails app is offline, so stopping Agent Identity Control Room does not break normal OpenCode usage.
 
 ## Contributor Quick Start
 
@@ -110,7 +114,7 @@ The prototype still uses the internal `AGENT_PASSPORTS_*` environment variable p
 
 ## Architecture
 
-Agent Control Room has three main pieces:
+Agent Identity Control Room has three main pieces:
 
 - **Rails control room:** the live UI for sessions, runtime lineage, permission asks, passport details, and audit receipts.
 - **Runtime adapters:** integrations that translate agent runtime events into the canonical event shape.
@@ -154,11 +158,11 @@ env -u BUNDLE_GEMFILE -u BUNDLE_BIN_PATH bin/rails test:all
 
 ## Core Rule
 
-The agent runtime does the work. Agent Control Room observes, explains, gates, and records authority.
+The agent runtime does the work. Agent Identity Control Room observes, explains, gates, and records authority.
 
 ## What We Need Next
 
-Agent Control Room needs contributions that turn the prototype into a dependable local control plane for real coding-agent work.
+Agent Identity Control Room needs contributions that turn the prototype into a dependable local control plane for real coding-agent work.
 
 We would love help with:
 
@@ -172,3 +176,7 @@ We would love help with:
 - Security hardening for any future mode beyond loopback-only local development.
 
 See `CONTRIBUTING.md` for setup, testing, architecture rules, and contribution guidelines.
+
+## How Started
+
+[![Agent Identity Build Day](.github/agent_identity_build_day.jpg)](https://app.agihouse.org/events/agent-identity-build-day)

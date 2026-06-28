@@ -28,7 +28,7 @@ class RuntimeAdapters::MultiRuntimeCliTest < ActiveSupport::TestCase
     assert_equal "claude-test", process.spawn_args[1]
     assert_equal "--print", process.spawn_args[2]
     assert_equal "stream-json", process.spawn_args[process.spawn_args.index("--output-format") + 1]
-    assert_equal "Agent Control Room demo", process.spawn_args[process.spawn_args.index("--name") + 1]
+    assert_equal "Agent Identity Control Room demo", process.spawn_args[process.spawn_args.index("--name") + 1]
     assert_equal run.project_path, options.fetch(:chdir)
     assert_match %r{log/claude-code-demo-run-#{run.id}\.log\z}, options.fetch(:out)
     assert_equal [ :child, :out ], options.fetch(:err)
@@ -48,10 +48,10 @@ class RuntimeAdapters::MultiRuntimeCliTest < ActiveSupport::TestCase
     assert_equal run.id.to_s, env.fetch("AGENT_PASSPORTS_RUN_ID")
     assert_equal run.bridge_token, env.fetch("AGENT_PASSPORTS_BRIDGE_TOKEN")
     assert_equal "codex-test", process.spawn_args[1]
-    assert_equal "exec", process.spawn_args[2]
-    assert_includes process.spawn_args, "--json"
-    assert_equal "read-only", process.spawn_args[process.spawn_args.index("--sandbox") + 1]
     assert_equal "never", process.spawn_args[process.spawn_args.index("--ask-for-approval") + 1]
+    assert_equal "read-only", process.spawn_args[process.spawn_args.index("--sandbox") + 1]
+    assert_equal "exec", process.spawn_args[process.spawn_args.index("exec")]
+    assert_includes process.spawn_args, "--json"
     assert_equal run.project_path, options.fetch(:chdir)
     assert_match %r{log/codex-demo-run-#{run.id}\.log\z}, options.fetch(:out)
     assert_equal [ :child, :out ], options.fetch(:err)

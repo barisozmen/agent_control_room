@@ -1,0 +1,69 @@
+<%= turbo_frame_tag "tool_action_list" do %>
+  <% actions = local_assigns.fetch(:tool_actions) { run.tool_actions_for_display } %>
+
+  <div class="flex min-h-[calc(100dvh-53px)] flex-col">
+    <div class="ap-pane-header">
+      <div class="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p class="ap-kicker"><%= run.runtime_label.downcase %> session</p>
+          <h2 id="tools-drawer-title" class="ap-pane-title mt-1">Action ledger</h2>
+        </div>
+        <p class="ap-mono text-xs ap-muted"><%= pluralize(actions.size, "action") %></p>
+      </div>
+    </div>
+
+    <div class="ap-scroll flex-1 overflow-auto">
+      <% if actions.any? %>
+        <ol id="session_action_list" data-testid="session-action-list" class="divide-y divide-[rgba(8,0,0,0.10)]">
+          <% actions.each do |action| %>
+            <% passport = action.passport %>
+            <% permission_state = tool_action_permission_state(action) %>
+            <% payload_text = action.request_text if action.request_text.present? && action.request_text != action.action_summary %>
+
+            <li id="<%= dom_id(action) %>"
+                data-testid="session-action"
+                data-action-status="<%= action.status %>"
+                data-action-capability="<%= action.capability %>"
+                class="grid grid-cols-1 gap-3 px-4 py-3 transition-colors hover:bg-[var(--ap-bg-weak)] lg:grid-cols-[92px_1fr] lg:items-start">
+              <div class="ap-mono text-xs ap-muted">
+                <%= action.requested_at.strftime("%H:%M:%S") %>
+              </div>
+
+              <div class="min-w-0">
+                <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+                  <span class="ap-event-chip"><%= action.capability %></span>
+                  <span class="ap-mono text-xs ap-muted"><%= action.action_kind %></span>
+                  <%= link_to passport.actor_name,
+                        run_path(run, passport_id: passport.id, panel: "passport"),
+                        class: "ap-inline-link ap-mono text-xs",
+                        data: { turbo_frame: "_top", testid: "session-action-actor" } %>
+                  <span data-testid="session-action-status" class="ap-mono ml-auto text-xs font-medium <%= result_text_classes(action.status) %>"><%= action.status %></span>
+                </div>
+
+                <p data-testid="session-action-summary" class="mt-2 text-sm font-medium leading-5 ap-text-strong"><%= action.action_summary %></p>
+
+                <% if payload_text.present? %>
+                  <p data-testid="session-action-payload" class="ap-mono mt-1 break-words text-xs ap-body-muted"><%= payload_text %></p>
+                <% end %>
+
+                <p class="ap-mono mt-2 truncate text-xs ap-muted"><%= passport.lineage_label %></p>
+                <p data-testid="session-action-permission" class="ap-mono mt-1 break-words text-xs ap-muted">
+                  permission:
+                  <span class="font-medium <%= result_text_classes(permission_state[:result]) %>"><%= permission_state[:label] %></span>
+                  <span class="ap-muted"><%= permission_state[:detail] %></span>
+                  <% if action.exit_status.present? %>
+                    <span class="ap-muted">exit <%= action.exit_status %></span>
+                  <% end %>
+                </p>
+              </div>
+            </li>
+          <% end %>
+        </ol>
+      <% else %>
+        <div class="p-4">
+          <p class="ap-empty">no actions captured</p>
+        </div>
+      <% end %>
+    </div>
+  </div>
+<% end %>

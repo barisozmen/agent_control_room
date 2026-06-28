@@ -71,7 +71,7 @@
           <% if recent_actions.any? %>
             <div class="mt-3 space-y-2">
               <% recent_actions.each do |action| %>
-                <%= link_to run_path(run, passport_id: passport.id, panel: "audit"), class: "ap-inspector-box block px-3 py-2", data: { turbo_frame: "_top" } do %>
+                <%= link_to run_path(run, passport_id: passport.id, panel: "tools"), class: "ap-inspector-box block px-3 py-2", data: { turbo_frame: "_top" } do %>
                   <div class="flex items-start justify-between gap-3">
                     <p class="min-w-0 truncate text-sm font-medium ap-text-strong"><%= action.action_summary %></p>
                     <span class="ap-mono shrink-0 text-xs <%= result_text_classes(action.status) %>"><%= action.status %></span>

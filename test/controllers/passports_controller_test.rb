@@ -43,7 +43,7 @@ class PassportsControllerTest < ActionDispatch::IntegrationTest
     assert_select "span", text: "bash"
     assert_select "span", text: "deny"
     assert_select "h3", text: "recent actions"
-    assert_select "a[href='#{run_path(run, passport_id: passport.id, panel: "audit")}'][data-turbo-frame='_top']", text: /Fetch external auth guidance/
+    assert_select "a[href='#{run_path(run, passport_id: passport.id, panel: "tools")}'][data-turbo-frame='_top']", text: /Fetch external auth guidance/
     assert_select "span", text: "blocked"
   end
 end

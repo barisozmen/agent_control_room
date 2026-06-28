@@ -3,13 +3,17 @@
     <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div class="min-w-0">
         <div class="flex flex-wrap items-center gap-3">
-          <h1 class="ap-mono w-full text-2xl font-medium leading-tight ap-text-strong sm:w-auto">Agent Control Room</h1>
+          <div class="flex w-full min-w-0 items-center gap-2 sm:w-auto">
+            <%= image_tag "/agent-control-room-logo.png", alt: "", width: 40, height: 40, class: "shrink-0" %>
+            <h1 class="ap-mono min-w-0 text-2xl font-medium leading-tight ap-text-strong">Agent Identity Control Room</h1>
+          </div>
           <span class="ap-mono inline-flex items-center gap-2 text-xs font-medium ap-body-muted">
             <span class="ap-status-dot <%= status_dot_classes(run.status) %>" aria-hidden="true"></span>
             <span class="ap-status-text">Status: <%= status_label(run.status) %></span>
           </span>
           <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.passports.count, "passport") %></span>
           <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.permission_requests.where(status: "pending").count, "pending ask") %></span>
+          <span class="ap-mono text-xs font-medium ap-body-muted"><%= pluralize(run.tool_actions.count, "action") %></span>
         </div>
         <% if run.error_message.present? %>
           <p class="ap-mono mt-2 break-words text-xs ap-result-negative"><%= run.error_message %></p>
@@ -20,6 +24,7 @@
       </div>
 
       <div class="flex flex-wrap items-center gap-3">
+        <%= link_to "Actions", run_path(run, panel: "tools"), class: "ap-quiet-link", data: { turbo_frame: "_top" } %>
         <%= link_to "Receipts", run_path(run, panel: "audit"), class: "ap-quiet-link", data: { turbo_frame: "_top" } %>
         <% if run.active? %>
           <span class="ap-mono text-xs ap-muted">run in progress</span>

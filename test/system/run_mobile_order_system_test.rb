@@ -8,6 +8,10 @@ class RunMobileOrderSystemTest < ApplicationSystemTestCase
     options.add_argument("--force-prefers-reduced-motion")
   end
 
+  setup do
+    page.driver.browser.manage.window.resize_to(390, 900)
+  end
+
   test "narrow run workspace shows lineage before current ask before session history" do
     run = demo_run
 

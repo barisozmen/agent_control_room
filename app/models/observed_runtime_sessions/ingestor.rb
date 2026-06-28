@@ -9,7 +9,9 @@ module ObservedRuntimeSessions
     PROCESSABLE_TYPES = %w[
       session.started
       actor.delegated
+      runtime.event
       tool.requested
+      tool.observed
       tool.finished
       tool.blocked
       session.finished
@@ -78,7 +80,7 @@ module ObservedRuntimeSessions
     end
 
     def actor_event?
-      event[:type].in?(%w[tool.requested tool.finished tool.blocked actor.delegated])
+      event[:type].in?(%w[tool.requested tool.observed tool.finished tool.blocked actor.delegated])
     end
 
     def ensure_base_passports!

@@ -119,7 +119,69 @@ class RuntimeObserverEventsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal "codex", run.runtime_name
     assert_equal "asking", action.status
-    assert_equal run.permission_requests.last.id, body.fetch("permission_request_id")
+    assert_equal action.permission_request.id, body.fetch("permission_request_id")
+  end
+
+  test "creates observed Codex action without gating posthoc execution" do
+    assert_difference -> { ToolAction.count }, 1 do
+      assert_no_difference -> { PermissionRequest.count } do
+        post_observer_event(
+          "codex",
+          type: "tool.observed",
+          event_id: "codex-observed-action-1",
+          session_id: "codex-observed-session-3",
+          title: "Codex observed actions",
+          project_path: Rails.root.to_s,
+          actor_ref: "main-agent",
+          capability: "bash",
+          action_kind: "shell_command",
+          action_summary: "bin/rails test",
+          command: "bin/rails test",
+          status: "finished",
+          exit_status: 0,
+          observation_mode: "posthoc"
+        )
+      end
+    end
+
+    assert_response :created
+    body = JSON.parse(response.body)
+    run = Run.find(body.fetch("run_id"))
+    action = run.tool_actions.find_by!(source_event_id: "codex-observed-action-1")
+
+    assert_equal "codex", run.runtime_name
+    assert_equal "finished", action.status
+    assert_equal 0, action.exit_status
+    assert_equal "posthoc", action.canonical_payload.fetch("observation_mode")
+    assert run.audit_events.where(event_kind: "tool.observed", tool_action: action).exists?
+  end
+
+  test "duplicate observed Codex action is idempotent" do
+    event = {
+      type: "tool.observed",
+      event_id: "codex-observed-action-dupe",
+      session_id: "codex-observed-session-dupe",
+      title: "Codex observed actions",
+      project_path: Rails.root.to_s,
+      actor_ref: "main-agent",
+      capability: "bash",
+      action_kind: "shell_command",
+      action_summary: "bin/rails test",
+      command: "bin/rails test",
+      status: "running",
+      observation_mode: "posthoc"
+    }
+
+    post_observer_event("codex", event)
+    assert_response :created
+
+    assert_no_difference -> { ToolAction.count } do
+      assert_no_difference -> { AuditEvent.count } do
+        post_observer_event("codex", event)
+      end
+    end
+
+    assert_response :created
   end
 
   private

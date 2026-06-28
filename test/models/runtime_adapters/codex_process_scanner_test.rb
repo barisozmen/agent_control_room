@@ -34,7 +34,7 @@ class RuntimeAdapters::CodexProcessScannerTest < ActiveSupport::TestCase
     assert_equal Rails.root.to_s, session.cwd
     assert_equal "session.started", event.fetch(:type)
     assert_equal "codex-process-101-#{Time.zone.parse("Sat Jun 27 13:14:38 2026").to_i}", event.fetch(:session_id)
-    assert_equal "Codex: #{Rails.root.basename}", event.fetch(:title)
+    assert_equal "Codex", event.fetch(:title)
     assert_equal 101, event.fetch(:pid)
   end
 end

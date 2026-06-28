@@ -1,43 +1,87 @@
-<turbo-frame id="session_sidebar">
+<turbo-frame id="session_sidebar"
+             data-controller="session-filter"
+             data-session-filter-storage-key-value="agent-control-room:session-runtime-filter">
   <% pending_counts_by_run_id = local_assigns.fetch(:pending_counts_by_run_id) { {} } %>
 
   <div class="flex h-full flex-col">
     <div class="ap-pane-header">
       <div class="flex items-end justify-between gap-4">
         <div>
-          <p class="ap-kicker">runtime sessions</p>
-          <h2 class="ap-pane-title mt-1">Sessions</h2>
+          <h2 class="ap-pane-title">Runtime sessions</h2>
         </div>
         <span class="ap-mono text-xs ap-muted"><%= runs.size %></span>
+      </div>
+
+      <div class="mt-3 flex flex-wrap gap-1" role="group" aria-label="Filter runtime sessions">
+        <% [["all", "All"], ["codex", "Codex"], ["opencode", "Opencode"]].each do |runtime_filter, label| %>
+          <button type="button"
+                  class="ap-quiet-link <%= "ap-quiet-link-active" if runtime_filter == "all" %>"
+                  data-session-filter-target="button"
+                  data-session-filter-runtime-value="<%= runtime_filter %>"
+                  data-action="session-filter#select"
+                  aria-pressed="<%= runtime_filter == "all" %>">
+            <%= label %>
+          </button>
+        <% end %>
       </div>
     </div>
 
     <div class="ap-scroll flex-1 overflow-auto p-2">
       <% if runs.any? %>
-        <ol class="space-y-1">
-          <% runs.each do |run| %>
-            <% selected = selected_run&.id == run.id %>
-            <% pending_count = pending_counts_by_run_id.fetch(run.id, 0) %>
-            <li>
-              <% link_options = { class: "ap-session-row #{selected ? "ap-session-row-selected" : ""}", data: { turbo_frame: "_top" } } %>
-              <% link_options[:aria] = { current: "page" } if selected %>
-              <%= link_to run_path(run), link_options do %>
-                <span class="ap-status-dot mt-1 shrink-0 <%= status_dot_classes(run.status) %>" aria-hidden="true"></span>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-sm font-semibold ap-text-strong"><%= run.display_title %></span>
-                  <span class="ap-status-text ap-mono mt-1 block truncate text-xs ap-muted">Status: <%= status_label(run.status) %></span>
-                  <span class="ap-mono mt-1 block truncate text-xs ap-muted"><%= run.display_project %></span>
-                  <span class="ap-mono mt-1 block truncate text-xs ap-body-muted">
-                    <%= run.runtime_label %> / <%= run.runtime_session_id.presence || "demo-run-#{run.id}" %>
-                  </span>
-                </span>
-                <% if pending_count.positive? %>
-                  <span class="ap-count-pill shrink-0"><%= pending_count %></span>
+        <ol class="space-y-5">
+          <% session_sidebar_project_groups(runs).each do |project| %>
+            <li class="ap-session-project" data-session-filter-target="project">
+              <details open
+                       class="group/project"
+                       data-controller="collapsible-project"
+                       data-collapsible-project-key-value="<%= project[:path] %>"
+                       data-action="toggle->collapsible-project#save">
+                <summary class="list-none cursor-pointer rounded-md p-2 transition-colors hover:bg-[var(--ap-bg-weak)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(33,30,30,0.18)]">
+                  <div class="flex items-center justify-between gap-2">
+                    <div class="flex min-w-0 flex-1 items-center gap-2">
+                      <span class="ap-project-chevron shrink-0 text-xs ap-muted transition-transform group-open/project:rotate-90" aria-hidden="true">&rsaquo;</span>
+                      <h3 class="ap-kicker min-w-0 flex-1 truncate" title="<%= project[:path] %>"><%= project[:name] %></h3>
+                    </div>
+                    <span class="ap-mono text-xs ap-muted"><%= project[:total_runs] %></span>
+                  </div>
+                  <p class="ap-mono mt-1 block truncate pl-4 text-xs ap-muted" title="<%= project[:path] %>"><%= project[:path] %></p>
+                </summary>
+
+                <% if project[:runs].any? %>
+                <ol class="ap-session-visible-list mt-1 space-y-1">
+                  <% project[:runs].each do |run| %>
+                    <%= render "runs/session_sidebar_run", run: run, selected_run: selected_run, pending_counts_by_run_id: pending_counts_by_run_id %>
+                  <% end %>
+                </ol>
                 <% end %>
-              <% end %>
+
+                <% if project[:killed_runs].any? %>
+                  <% killed_open = project[:killed_runs].any? { |run| selected_run&.id == run.id } %>
+                  <details class="ap-session-killed-details"
+                           data-session-filter-target="group"
+                           <%= "open" if killed_open %>
+                           data-controller="collapsible-project"
+                           data-collapsible-project-key-value="<%= "#{project[:path]}:killed" %>"
+                           data-collapsible-project-force-open-value="<%= killed_open %>"
+                           data-action="toggle->collapsible-project#save">
+                    <summary class="ap-session-killed-summary">
+                      <span class="ap-session-killed-chevron shrink-0 text-xs ap-muted" aria-hidden="true">&rsaquo;</span>
+                      <span class="ap-kicker min-w-0 flex-1 truncate">Killed</span>
+                      <span class="ap-mono text-xs ap-muted"><%= project[:killed_runs].size %></span>
+                    </summary>
+
+                    <ol class="ap-session-killed-list space-y-1">
+                      <% project[:killed_runs].each do |run| %>
+                        <%= render "runs/session_sidebar_run", run: run, selected_run: selected_run, pending_counts_by_run_id: pending_counts_by_run_id %>
+                      <% end %>
+                    </ol>
+                  </details>
+                <% end %>
+              </details>
             </li>
           <% end %>
         </ol>
+        <p class="ap-empty" data-session-filter-target="empty" hidden>no matching runtime sessions observed</p>
       <% else %>
         <p class="ap-empty">no runtime sessions observed</p>
       <% end %>

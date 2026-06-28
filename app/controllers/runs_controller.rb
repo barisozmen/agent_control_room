@@ -20,7 +20,8 @@ class RunsController < ApplicationController
     @runs = @session_sidebar.fetch(:runs)
     @passport_tree = @run.passport_tree
     @selected_passport = @passport_tree.selected_passport(params[:passport_id])
-    @panel = %w[passport audit].include?(params[:panel]) ? params[:panel] : nil
+    @tool_actions = @run.tool_actions_for_display
+    @panel = %w[passport tools audit].include?(params[:panel]) ? params[:panel] : nil
   end
 
   private

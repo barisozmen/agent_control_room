@@ -12,7 +12,9 @@ module CanonicalRuntimeEvents
       case event.fetch(:type)
       when "session.started" then record_session_started
       when "actor.delegated" then mint_passport
+      when "runtime.event" then record_runtime_event
       when "tool.requested" then authorize_tool_action
+      when "tool.observed" then record_observed_tool_action
       when "tool.finished" then finish_tool_action
       when "tool.blocked" then block_tool_action
       when "session.finished" then finish_session
@@ -75,7 +77,7 @@ module CanonicalRuntimeEvents
       case decision
       when "allow"
         action.update!(status: "allowed")
-        mark_ui_changes(:passport_detail) if action.saved_change_to_status?
+        mark_ui_changes(:passport_detail, :tool_action_list) if action.saved_change_to_status?
         audit!("tool.allowed", passport: passport, tool_action: action, result: "allowed", capability: action.capability, action_summary: action.action_summary)
       when "ask"
         action.update!(status: "asking")
@@ -88,21 +90,34 @@ module CanonicalRuntimeEvents
           record.suggested_capability = event[:suggested_capability].presence || action.capability
           record.suggested_pattern = event[:suggested_pattern].presence || action.request_text
         end
-        mark_ui_changes(:run_header, :session_sidebar, :permission_inbox, :passport_detail)
+        mark_ui_changes(:run_header, :session_sidebar, :permission_inbox, :passport_detail, :tool_action_list)
         audit!("permission.requested", passport: passport, tool_action: action, permission_request: request, result: "ask", capability: action.capability, action_summary: action.action_summary)
       else
         action.update!(status: "blocked", finished_at: occurred_at)
-        mark_ui_changes(:passport_detail) if action.saved_change_to_status?
+        mark_ui_changes(:passport_detail, :tool_action_list) if action.saved_change_to_status?
         audit!("tool.blocked", passport: passport, tool_action: action, result: "blocked", capability: action.capability, action_summary: action.action_summary)
       end
 
       action
     end
 
+    def record_observed_tool_action
+      passport = run.passports.find_by!(actor_ref: event.fetch(:actor_ref))
+      action = find_or_create_tool_action!(passport)
+      status = event[:status].presence_in(ToolAction::STATUSES) || "running"
+      attributes = { status: status }
+      attributes[:finished_at] = occurred_at if status.in?(%w[finished blocked failed])
+      attributes[:exit_status] = event[:exit_status] if event.key?(:exit_status)
+      action.update!(attributes)
+      mark_ui_changes(:run_header, :passport_detail, :tool_action_list) if action.saved_changes?
+      audit!("tool.observed", passport: passport, tool_action: action, result: "observed", capability: action.capability, action_summary: action.action_summary)
+      action
+    end
+
     def finish_tool_action
       action = terminal_tool_action
       action.update!(status: "finished", finished_at: occurred_at, exit_status: event[:exit_status])
-      mark_ui_changes(:passport_detail) if action.saved_change_to_status?
+      mark_ui_changes(:passport_detail, :tool_action_list) if action.saved_change_to_status?
       audit!("tool.finished", passport: action.passport, tool_action: action, result: "finished", capability: action.capability, action_summary: action.action_summary)
       action
     end
@@ -110,7 +125,7 @@ module CanonicalRuntimeEvents
     def block_tool_action
       action = terminal_tool_action
       action.update!(status: "blocked", finished_at: occurred_at)
-      mark_ui_changes(:passport_detail) if action.saved_change_to_status?
+      mark_ui_changes(:passport_detail, :tool_action_list) if action.saved_change_to_status?
       audit!("tool.blocked", passport: action.passport, tool_action: action, result: "blocked", capability: action.capability, action_summary: action.action_summary)
       action
     end
@@ -119,6 +134,19 @@ module CanonicalRuntimeEvents
       run.update!(status: event[:status].presence || "completed", finished_at: occurred_at)
       mark_ui_changes(:run_header, :session_sidebar) if run.saved_change_to_status?
       audit!("session.finished", result: run.status, action_summary: "#{run.runtime_label} session #{run.status}")
+      run
+    end
+
+    def record_runtime_event
+      passport = event[:actor_ref].present? ? run.passports.find_by(actor_ref: event[:actor_ref]) : nil
+      audit!(
+        event[:event_kind].presence || "runtime.event",
+        passport: passport,
+        result: event[:result].presence || "observed",
+        capability: event[:capability],
+        action_summary: event[:action_summary]
+      )
+      mark_ui_changes(:run_header, :tool_action_list)
       run
     end
 

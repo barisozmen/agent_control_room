@@ -66,7 +66,7 @@ class ControlRoomFlowsTest < ActionDispatch::IntegrationTest
     assert_select "h2", text: "auth-reviewer"
     assert_select "p", text: passport.lineage_label
     assert_select "span", text: "web"
-    assert_select "a[href='#{run_path(run, passport_id: passport.id, panel: "audit")}'][data-turbo-frame='_top']", text: /Fetch external auth/
+    assert_select "a[href='#{run_path(run, passport_id: passport.id, panel: "tools")}'][data-turbo-frame='_top']", text: /Fetch external auth/
   end
 
   test "run page keeps inspection panes behind drawer URLs" do
@@ -78,6 +78,7 @@ class ControlRoomFlowsTest < ActionDispatch::IntegrationTest
     assert_select ".ap-drawer", count: 0
     assert_select "turbo-frame#audit_timeline", count: 0
     assert_select "turbo-frame#passport_detail", count: 0
+    assert_select "turbo-frame#tool_action_list", count: 0
     assert_select "a.ap-passport-node[data-turbo-frame='_top']", minimum: 1
     assert_select "a[href='#{run_path(run, passport_id: passport.id, panel: "passport")}'][data-turbo-frame='_top']", text: "auth-reviewer"
 
@@ -88,6 +89,7 @@ class ControlRoomFlowsTest < ActionDispatch::IntegrationTest
     assert_select ".ap-drawer[role='dialog'][aria-modal='true'][aria-labelledby='passport-drawer-title'][data-drawer-target='dialog']"
     assert_select ".ap-drawer-panel[tabindex='-1'][data-drawer-target='panel']"
     assert_select "a.ap-quiet-link", text: "Passport"
+    assert_select "a.ap-quiet-link", text: "Actions"
     assert_select "a.ap-quiet-link", text: "Receipts"
     assert_select "a.ap-quiet-link", text: "Close"
     assert_select "turbo-frame#passport_detail"
@@ -99,6 +101,72 @@ class ControlRoomFlowsTest < ActionDispatch::IntegrationTest
     assert_select "turbo-frame#audit_timeline"
     assert_select "h2#audit-drawer-title", text: "Receipt drawer"
     assert_select "span", text: "actor.delegated"
+
+    get run_path(run, panel: "tools")
+    assert_response :success
+    assert_select ".ap-drawer[role='dialog'][aria-modal='true'][aria-labelledby='tools-drawer-title']"
+    assert_select "turbo-frame#tool_action_list"
+    assert_select "h2#tools-drawer-title", text: "Action ledger"
+  end
+
+  test "developer can review tool usage with passport permission state" do
+    run = demo_run
+
+    get run_path(run, panel: "tools")
+
+    assert_response :success
+    assert_select "turbo-frame#tool_action_list"
+    assert_select "p", text: "Read README.md and demo docs"
+    assert_select "p", text: /Had passport permission/
+    assert_select "p", text: "Patch app/models/user.rb with a demo-safe change"
+    assert_select "p", text: /Needs approval/
+    assert_select "a[href*='panel=passport']", text: "code-writer"
+  end
+
+  test "developer can review observed Codex actions in the action ledger" do
+    run = create_run(runtime_name: "codex")
+    owner = create_passport(run: run, actor_ref: "local-owner", actor_name: "Baris", actor_kind: "human", provider: "local")
+    passport = create_passport(
+      run: run,
+      actor_ref: "main-agent",
+      actor_name: "codex/main-agent",
+      parent: owner,
+      provider: "codex",
+      rules: { bash: "ask" }
+    )
+    action = run.tool_actions.create!(
+      passport: passport,
+      capability: "bash",
+      action_kind: "shell_command",
+      action_summary: "bin/rails test",
+      command: "bin/rails test",
+      status: "asking",
+      requested_at: Time.current
+    )
+    run.permission_requests.create!(
+      passport: passport,
+      tool_action: action,
+      status: "pending",
+      risk_level: "medium",
+      risk_summary: "Runs tests",
+      suggested_capability: "bash",
+      suggested_pattern: "bin/rails test"
+    )
+
+    get run_path(run, panel: "tools")
+
+    assert_response :success
+    assert_select "turbo-frame#tool_action_list"
+    assert_select "p.ap-kicker", text: "codex session"
+    assert_select "h2#tools-drawer-title", text: "Action ledger"
+    assert_select "ol#session_action_list[data-testid='session-action-list']"
+    assert_select "li##{dom_id(action)}[data-testid='session-action'][data-action-status='asking'][data-action-capability='bash']" do
+      assert_select "[data-testid='session-action-actor']", text: "codex/main-agent"
+      assert_select "[data-testid='session-action-summary']", text: "bin/rails test"
+      assert_select "[data-testid='session-action-permission']", text: /permission:\s+Needs approval/
+      assert_select "[data-testid='session-action-status']", text: "asking"
+      assert_select "a[href='#{run_path(run, passport_id: passport.id, panel: "passport")}']"
+    end
   end
 
   test "developer can review the run audit frame" do

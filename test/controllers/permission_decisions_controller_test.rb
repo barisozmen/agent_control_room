@@ -5,7 +5,7 @@ class PermissionDecisionsControllerTest < ActionDispatch::IntegrationTest
     run = demo_run
     request = run.permission_requests.joins(:passport).find_by!(passports: { actor_ref: "security-auditor" })
 
-    assert_turbo_stream_broadcasts run, count: 6 do
+    assert_turbo_stream_broadcasts run, count: 7 do
       assert_difference -> { Grant.count }, 1 do
         post permission_request_decisions_path(request),
           params: { decision: { scope: "passport" } },
@@ -18,6 +18,7 @@ class PermissionDecisionsControllerTest < ActionDispatch::IntegrationTest
     assert_includes response.body, "permission_inbox"
     assert_includes response.body, "passport_detail"
     assert_includes response.body, "audit_timeline"
+    assert_includes response.body, "tool_action_list"
   end
 
   test "final decision completes run" do

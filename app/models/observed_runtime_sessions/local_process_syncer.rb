@@ -49,7 +49,10 @@ module ObservedRuntimeSessions
     attr_reader :scanners
 
     def default_scanners
-      [ RuntimeAdapters::CodexProcessScanner.new ]
+      [
+        RuntimeAdapters::CodexProcessScanner.new,
+        RuntimeAdapters::CodexSessionLogScanner.new
+      ]
     end
 
     def ingest(session)

@@ -3,7 +3,10 @@
     <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div>
         <p class="ap-kicker">local runtime control</p>
-        <h1 class="ap-mono text-2xl font-medium leading-tight ap-text-strong">Agent Control Room</h1>
+        <div class="flex min-w-0 items-center gap-2">
+          <%= image_tag "/agent-control-room-logo.png", alt: "", width: 40, height: 40, class: "shrink-0" %>
+          <h1 class="ap-mono min-w-0 text-2xl font-medium leading-tight ap-text-strong">Agent Identity Control Room</h1>
+        </div>
       </div>
 
       <div class="flex flex-wrap items-center gap-2">
@@ -14,9 +17,26 @@
     </div>
   </div>
 
-  <section class="ap-workspace ap-workspace-empty">
-    <aside class="ap-panel ap-border border-b lg:border-b-0 lg:border-r">
+  <section class="ap-workspace ap-workspace-empty"
+           data-controller="sidebar-resize"
+           data-sidebar-resize-storage-key-value="agent-control-room:session-sidebar-width"
+           data-sidebar-resize-min-value="176"
+           data-sidebar-resize-max-value="420"
+           data-sidebar-resize-reserved-width-value="360">
+    <aside class="ap-panel ap-workspace-sidebar ap-border border-b lg:border-b-0 lg:border-r" data-sidebar-resize-target="sidebar">
       <%= render partial: "runs/session_sidebar", locals: @session_sidebar || Run.session_sidebar_locals(selected_run: nil) %>
+      <div class="ap-sidebar-resizer"
+           role="separator"
+           tabindex="0"
+           aria-label="Resize sessions sidebar"
+           aria-orientation="vertical"
+           aria-controls="session_sidebar"
+           aria-valuemin="176"
+           aria-valuemax="420"
+           aria-valuenow="208"
+           title="Drag to resize sessions sidebar"
+           data-sidebar-resize-target="handle"
+           data-action="pointerdown->sidebar-resize#start keydown->sidebar-resize#handleKeydown"></div>
     </aside>
 
     <div class="grid min-h-[calc(100dvh-73px)] place-items-center px-4 lg:col-span-2">

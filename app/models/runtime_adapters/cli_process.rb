@@ -143,7 +143,12 @@ module RuntimeAdapters
         )
       end
 
+      ingest_process_log!(run)
       run.reload.broadcast_control_room!
+    end
+
+    def ingest_process_log!(_run)
+      nil
     end
 
     def process_result(status)

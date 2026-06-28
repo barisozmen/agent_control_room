@@ -4,9 +4,26 @@
   <div data-drawer-target="background" <%= "inert" if @panel.present? %>>
     <%= render "runs/run_header", run: @run %>
 
-    <section class="ap-workspace">
-      <aside class="ap-panel ap-workspace-sessions ap-border border-b lg:border-b-0 lg:border-r">
+    <section class="ap-workspace"
+             data-controller="sidebar-resize"
+             data-sidebar-resize-storage-key-value="agent-control-room:session-sidebar-width"
+             data-sidebar-resize-min-value="176"
+             data-sidebar-resize-max-value="420"
+             data-sidebar-resize-reserved-width-value="740">
+      <aside class="ap-panel ap-workspace-sidebar ap-workspace-sessions ap-border border-b lg:border-b-0 lg:border-r" data-sidebar-resize-target="sidebar">
         <%= render partial: "runs/session_sidebar", locals: @session_sidebar || Run.session_sidebar_locals(selected_run: @run) %>
+        <div class="ap-sidebar-resizer"
+             role="separator"
+             tabindex="0"
+             aria-label="Resize sessions sidebar"
+             aria-orientation="vertical"
+             aria-controls="session_sidebar"
+             aria-valuemin="176"
+             aria-valuemax="420"
+             aria-valuenow="208"
+             title="Drag to resize sessions sidebar"
+             data-sidebar-resize-target="handle"
+             data-action="pointerdown->sidebar-resize#start keydown->sidebar-resize#handleKeydown"></div>
       </aside>
 
       <aside class="ap-panel ap-workspace-lineage ap-border border-b lg:border-b-0 lg:border-r">
@@ -20,11 +37,12 @@
   </div>
 
   <% if @panel.present? %>
-    <aside class="ap-drawer ap-drawer-open" role="dialog" aria-modal="true" aria-labelledby="<%= @panel == "audit" ? "audit-drawer-title" : "passport-drawer-title" %>" data-drawer-target="dialog" data-action="keydown@window->drawer#handleKeydown">
+    <aside class="ap-drawer ap-drawer-open" role="dialog" aria-modal="true" aria-labelledby="<%= @panel == "audit" ? "audit-drawer-title" : @panel == "tools" ? "tools-drawer-title" : "passport-drawer-title" %>" data-drawer-target="dialog" data-action="keydown@window->drawer#handleKeydown">
       <div class="ap-drawer-panel" tabindex="-1" data-drawer-target="panel">
         <div class="ap-drawer-topbar">
           <div class="flex items-center gap-2">
             <%= link_to "Passport", run_path(@run, passport_id: @selected_passport&.id, panel: "passport"), class: "ap-quiet-link #{@panel == "passport" ? "ap-quiet-link-active" : ""}" %>
+            <%= link_to "Actions", run_path(@run, passport_id: @selected_passport&.id, panel: "tools"), class: "ap-quiet-link #{@panel == "tools" ? "ap-quiet-link-active" : ""}" %>
             <%= link_to "Receipts", run_path(@run, passport_id: @selected_passport&.id, panel: "audit"), class: "ap-quiet-link #{@panel == "audit" ? "ap-quiet-link-active" : ""}" %>
           </div>
           <%= link_to "Close", run_path(@run, passport_id: @selected_passport&.id), class: "ap-quiet-link" %>
@@ -32,6 +50,8 @@
 
         <% if @panel == "audit" %>
           <%= render "runs/audit_timeline", run: @run, audit_event_page: @run.audit_timeline_page %>
+        <% elsif @panel == "tools" %>
+          <%= render "runs/tool_action_list", run: @run, tool_actions: @tool_actions || @run.tool_actions_for_display %>
         <% else %>
           <%= render "runs/passport_detail", run: @run, passport: @selected_passport %>
         <% end %>

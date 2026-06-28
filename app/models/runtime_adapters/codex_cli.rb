@@ -4,7 +4,7 @@ module RuntimeAdapters
     Noop = CliProcess::Noop
 
     DEMO_PROMPT = <<~PROMPT.squish
-      Run the Agent Control Room demo task for this local repository. Inspect
+      Run the Agent Identity Control Room demo task for this local repository. Inspect
       README.md and docs/requirements.md, keep tool use minimal, and do not
       modify files. The Rails control room is observing this Codex process.
     PROMPT
@@ -14,9 +14,15 @@ module RuntimeAdapters
       super(
         runtime: runtime,
         command: command || ENV.fetch(runtime.command_env_key, runtime.default_command),
-        demo_args: [ "exec", "--json", "--sandbox", "read-only", "--ask-for-approval", "never", DEMO_PROMPT ],
+        demo_args: [ "--ask-for-approval", "never", "--sandbox", "read-only", "exec", "--json", DEMO_PROMPT ],
         **options
       )
+    end
+
+    private
+
+    def ingest_process_log!(run)
+      RuntimeAdapters::CodexRunLogIngestor.new(run: run, path: log_path(run)).process
     end
   end
 end

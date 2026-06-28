@@ -67,7 +67,8 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
       [ "replace", "session_sidebar" ],
       [ "replace", "run_header" ],
       [ "replace", "permission_inbox" ],
-      [ "replace", "passport_detail" ]
+      [ "replace", "passport_detail" ],
+      [ "replace", "tool_action_list" ]
     ]
     body = JSON.parse(response.body)
     assert_equal "ToolAction", body.fetch("type")
@@ -210,7 +211,8 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
       [ "append", "audit_event_list" ],
       [ "update", "audit_timeline_count" ],
       [ "remove", "audit_timeline_empty_state" ],
-      [ "replace", "passport_detail" ]
+      [ "replace", "passport_detail" ],
+      [ "replace", "tool_action_list" ]
     ]
   end
 
@@ -359,7 +361,8 @@ class RuntimeEventsControllerTest < ActionDispatch::IntegrationTest
     assert_runtime_streams streams, [
       [ "append", "audit_event_list" ],
       [ "update", "audit_timeline_count" ],
-      [ "replace", "passport_detail" ]
+      [ "replace", "passport_detail" ],
+      [ "replace", "tool_action_list" ]
     ]
     assert_equal "finished", action.reload.status
     assert_equal 0, action.exit_status

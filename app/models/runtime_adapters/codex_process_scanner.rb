@@ -9,7 +9,7 @@ module RuntimeAdapters
           type: "session.started",
           event_id: "#{session_id}-started",
           session_id: session_id,
-          title: "Codex: #{File.basename(cwd)}",
+          title: "Codex",
           project_path: cwd,
           pid: pid,
           occurred_at: started_at.iso8601
