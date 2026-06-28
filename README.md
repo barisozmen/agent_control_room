@@ -8,6 +8,8 @@ Observe agent sessions on your computer, inspect agent and subagent lineage, pau
 
 ![Agent Identity Control Room showing OpenCode sessions, runtime lineage, passport authority, and receipts](.github/assets/agent-control-room-working.png)
 
+[Watch the Agent Identity Control Room demo video](.github/assets/agent-control-room-video.mp4)
+
 The v1 prototype is OpenCode-first: a Rails control room plus an OpenCode observer. The core model is runtime-neutral, and the app now has concrete demo launch adapters for OpenCode, Claude Code, and Codex through the same event contract.
 
 ## Quick Start
