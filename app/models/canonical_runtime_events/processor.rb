@@ -9,17 +9,19 @@ module CanonicalRuntimeEvents
     end
 
     def process
-      case event.fetch(:type)
-      when "session.started" then record_session_started
-      when "actor.delegated" then mint_passport
-      when "runtime.event" then record_runtime_event
-      when "tool.requested" then authorize_tool_action
-      when "tool.observed" then record_observed_tool_action
-      when "tool.finished" then finish_tool_action
-      when "tool.blocked" then block_tool_action
-      when "session.finished" then finish_session
-      else
-        raise ArgumentError, "Unknown runtime event type: #{event[:type]}"
+      ApplicationRecord.transaction do
+        case event.fetch(:type)
+        when "session.started" then record_session_started
+        when "actor.delegated" then mint_passport
+        when "runtime.event" then record_runtime_event
+        when "tool.requested" then authorize_tool_action
+        when "tool.observed" then record_observed_tool_action
+        when "tool.finished" then finish_tool_action
+        when "tool.blocked" then block_tool_action
+        when "session.finished" then finish_session
+        else
+          raise ArgumentError, "Unknown runtime event type: #{event[:type]}"
+        end
       end
     end
 
@@ -165,6 +167,7 @@ module CanonicalRuntimeEvents
         end
       end
 
+      ensure_audit_event_matches!(record, kind, result, passport, tool_action, permission_request, capability, action_summary) unless created_audit_event
       @audit_event = record if created_audit_event
       record
     end
@@ -216,6 +219,18 @@ module CanonicalRuntimeEvents
       record.action_summary = action_summary
       record.result = result
       record.occurred_at = occurred_at
+    end
+
+    def ensure_audit_event_matches!(record, kind, result, passport, tool_action, permission_request, capability, action_summary)
+      return if record.event_kind == kind &&
+        record.result == result &&
+        record.passport_id == passport&.id &&
+        record.tool_action_id == tool_action&.id &&
+        record.permission_request_id == permission_request&.id &&
+        record.capability == capability &&
+        record.action_summary == action_summary
+
+      raise ArgumentError, "Runtime event id #{event[:event_id]} already belongs to another audit event"
     end
 
     def occurred_at
